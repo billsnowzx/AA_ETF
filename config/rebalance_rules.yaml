@@ -1,0 +1,25 @@
+standard_rebalance:
+  frequency: quarterly
+
+weight_drift_rule:
+  enabled: true
+  relative_deviation_threshold: 0.20
+  description: Trigger rebalance when an asset weight deviates by more than 20 percent of its target weight
+
+transaction_costs:
+  one_way_bps: 5
+
+trend_filter:
+  enabled: false
+  moving_average_months: 10
+  reduction_fraction: 0.50
+  note: Placeholder only in Phase 1. No execution logic is implemented yet.
+
+risk_switch:
+  enabled: false
+  lookback_days: 20
+  annualized_volatility_threshold: null
+  destination_assets:
+    - AGG
+    - GLD
+  note: Placeholder only in Phase 1. No execution logic is implemented yet.

@@ -1,0 +1,183 @@
+"""Phase 1 report assembly helpers."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pandas as pd
+
+
+def _format_percent(value: float | int | object) -> str:
+    """Format a decimal value as a percent string when numeric."""
+    if pd.isna(value):
+        return "n/a"
+    return f"{float(value):.2%}"
+
+
+def _format_decimal(value: float | int | object, digits: int = 4) -> str:
+    """Format a numeric value as a fixed-point decimal string when numeric."""
+    if pd.isna(value):
+        return "n/a"
+    return f"{float(value):.{digits}f}"
+
+
+def dataframe_to_markdown_table(frame: pd.DataFrame) -> str:
+    """Render a DataFrame as a simple Markdown table."""
+    table = frame.copy()
+    headers = ["index", *table.columns.tolist()]
+    lines = [
+        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join(["---"] * len(headers)) + " |",
+    ]
+
+    for index, row in table.iterrows():
+        values = [str(index), *[str(value) for value in row.tolist()]]
+        lines.append("| " + " | ".join(values) + " |")
+
+    return "\n".join(lines)
+
+
+def build_phase1_report_markdown(
+    strategy_name: str,
+    performance_summary: pd.DataFrame,
+    turnover_summary: pd.DataFrame,
+    annual_return_table: pd.DataFrame,
+    benchmark_comparisons: pd.DataFrame,
+    liquidity_table: pd.DataFrame,
+    etf_summary: pd.DataFrame,
+    chart_paths: dict[str, Path],
+    report_date: str,
+    notes: list[str] | None = None,
+) -> str:
+    """Build a concise Markdown report from Phase 1 pipeline outputs."""
+    strategy_row = performance_summary.loc[strategy_name]
+    investable = liquidity_table.index[liquidity_table["passes_liquidity_filter"]].tolist()
+    non_liquid = liquidity_table.index[~liquidity_table["passes_liquidity_filter"]].tolist()
+
+    performance_view = performance_summary.copy()
+    for column in [
+        "annualized_return",
+        "annualized_volatility",
+        "downside_volatility",
+        "sharpe_ratio",
+        "sortino_ratio",
+        "max_drawdown",
+        "calmar_ratio",
+        "ending_nav",
+        "total_turnover",
+        "total_transaction_cost_drag",
+    ]:
+        if column in performance_view.columns:
+            formatter = _format_percent if "return" in column or "volatility" in column or "drawdown" in column or "drag" in column else _format_decimal
+            if column in {"ending_nav", "total_turnover", "sharpe_ratio", "sortino_ratio", "calmar_ratio"}:
+                formatter = _format_decimal
+            performance_view[column] = performance_view[column].map(formatter)
+
+    turnover_view = turnover_summary.copy()
+    for column in ["total_turnover", "average_turnover", "total_transaction_cost_drag"]:
+        if column in turnover_view.columns:
+            turnover_view[column] = turnover_view[column].map(_format_decimal)
+
+    annual_view = annual_return_table.copy()
+    for column in annual_view.columns:
+        annual_view[column] = annual_view[column].map(_format_percent)
+
+    benchmark_view = benchmark_comparisons.copy()
+    for column in benchmark_view.columns:
+        if "ratio" in column:
+            benchmark_view[column] = benchmark_view[column].map(_format_decimal)
+        else:
+            benchmark_view[column] = benchmark_view[column].map(_format_percent)
+
+    etf_view = etf_summary[
+        [
+            "asset_class",
+            "average_dollar_volume",
+            "recent_pass_ratio",
+            "passes_liquidity_filter",
+            "phase1_total_score",
+            "phase1_rank",
+        ]
+    ].copy()
+    etf_view["average_dollar_volume"] = etf_view["average_dollar_volume"].map(lambda value: _format_decimal(value, digits=0))
+    etf_view["recent_pass_ratio"] = etf_view["recent_pass_ratio"].map(_format_percent)
+    etf_view["phase1_total_score"] = etf_view["phase1_total_score"].map(_format_decimal)
+
+    note_lines = "\n".join(f"- {note}" for note in notes) if notes else "- None"
+    figure_lines = "\n".join(f"- `{name}`: `{path.as_posix()}`" for name, path in chart_paths.items())
+
+    report = f"""# Phase 1 Pipeline Report
+
+Generated: {report_date}
+
+## Executive Summary
+
+- Strategy: `{strategy_name}`
+- Ending NAV: {_format_decimal(strategy_row["ending_nav"])}
+- Annualized return: {_format_percent(strategy_row["annualized_return"])}
+- Annualized volatility: {_format_percent(strategy_row["annualized_volatility"])}
+- Max drawdown: {_format_percent(strategy_row["max_drawdown"])}
+- Investable liquidity-passing ETFs: {", ".join(investable) if investable else "None"}
+- Liquidity-screen failures: {", ".join(non_liquid) if non_liquid else "None"}
+
+## Notes
+
+{note_lines}
+
+## Performance Summary
+
+{dataframe_to_markdown_table(performance_view)}
+
+## Turnover Summary
+
+{dataframe_to_markdown_table(turnover_view)}
+
+## Annual Return Table
+
+{dataframe_to_markdown_table(annual_view)}
+
+## Benchmark Comparisons
+
+{dataframe_to_markdown_table(benchmark_view) if not benchmark_view.empty else "No benchmark comparisons generated."}
+
+## ETF Summary
+
+{dataframe_to_markdown_table(etf_view)}
+
+## Figures
+
+{figure_lines}
+"""
+    return report
+
+
+def write_phase1_report(
+    strategy_name: str,
+    performance_summary: pd.DataFrame,
+    turnover_summary: pd.DataFrame,
+    annual_return_table: pd.DataFrame,
+    benchmark_comparisons: pd.DataFrame,
+    liquidity_table: pd.DataFrame,
+    etf_summary: pd.DataFrame,
+    chart_paths: dict[str, Path],
+    output_path: str | Path,
+    report_date: str,
+    notes: list[str] | None = None,
+) -> Path:
+    """Write the Phase 1 Markdown report to disk."""
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    report = build_phase1_report_markdown(
+        strategy_name=strategy_name,
+        performance_summary=performance_summary,
+        turnover_summary=turnover_summary,
+        annual_return_table=annual_return_table,
+        benchmark_comparisons=benchmark_comparisons,
+        liquidity_table=liquidity_table,
+        etf_summary=etf_summary,
+        chart_paths=chart_paths,
+        report_date=report_date,
+        notes=notes,
+    )
+    output.write_text(report, encoding="utf-8")
+    return output

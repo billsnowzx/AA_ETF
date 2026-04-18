@@ -1,0 +1,10 @@
+risk_limits:
+  portfolio:
+    annualized_volatility_warning: null
+    max_drawdown_warning: null
+  liquidity:
+    minimum_average_daily_dollar_volume: 50000000
+    recent_liquidity_pass_ratio: 0.80
+  implementation_notes:
+    - Placeholder config for future phases
+    - Phase 1 does not yet enforce these limits in code outside the liquidity filter

@@ -1,0 +1,441 @@
+"""Phase 1 pipeline runner for downloading, cleaning, and screening ETF data."""
+
+from __future__ import annotations
+
+import argparse
+import logging
+from pathlib import Path
+
+import pandas as pd
+
+from src.analytics.correlation import build_adjusted_close_matrix, return_matrix_from_prices
+from src.backtest.engine import run_fixed_weight_backtest
+from src.data.clean_data import batch_clean_price_frames
+from src.data.fetch_prices import fetch_prices
+from src.dashboard.plots import write_phase1_chart_outputs
+from src.dashboard.reporting import write_phase1_report
+from src.portfolio.benchmarks import load_benchmarks
+from src.portfolio.policy import (
+    build_backtest_universe_validation,
+    summarize_backtest_universe_validation,
+)
+from src.portfolio.rebalancer import load_standard_rebalance_frequency
+from src.portfolio.transaction_cost import load_one_way_transaction_cost_bps
+from src.portfolio.weights import load_portfolio_template
+from src.universe.etf_scoring import score_etf_universe
+from src.universe.liquidity_filter import filter_liquid_universe
+from src.universe.universe_builder import load_enabled_universe
+from src.utils.dates import validate_date_range
+from src.utils.logger import configure_logging
+
+LOGGER = logging.getLogger(__name__)
+
+
+def load_enabled_tickers(config_path: str | Path) -> list[str]:
+    """Load enabled tickers from the ETF universe config."""
+    return load_enabled_universe(config_path).index.tolist()
+
+
+def save_processed_frames(frames: dict[str, pd.DataFrame], output_dir: str | Path) -> None:
+    """Persist cleaned per-ticker frames to the processed data directory."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    for ticker, frame in frames.items():
+        frame.to_csv(output_path / f"{ticker}.csv", index=True)
+
+
+def build_asset_return_matrix(
+    clean_frames: dict[str, pd.DataFrame],
+    tickers: list[str] | None = None,
+) -> pd.DataFrame:
+    """Build an adjusted-close return matrix from cleaned per-ticker frames."""
+    selected_frames = clean_frames
+    if tickers is not None:
+        selected_frames = {ticker: clean_frames[ticker] for ticker in tickers if ticker in clean_frames}
+        missing_tickers = [ticker for ticker in tickers if ticker not in selected_frames]
+        if missing_tickers:
+            raise ValueError(f"Missing cleaned frames for tickers: {missing_tickers}")
+
+    price_matrix = build_adjusted_close_matrix(selected_frames)
+    return return_matrix_from_prices(price_matrix)
+
+
+def collect_required_backtest_tickers(
+    portfolio_template_config: str | Path,
+    benchmark_config: str | Path,
+    template_name: str | None = None,
+) -> list[str]:
+    """Collect the union of tickers required by the strategy template and benchmarks."""
+    strategy_weights = load_portfolio_template(
+        portfolio_template_config,
+        template_name if template_name else None,
+    )
+    benchmarks = load_benchmarks(benchmark_config)
+
+    ordered_tickers: list[str] = list(strategy_weights.index)
+    for benchmark in benchmarks.values():
+        for ticker in benchmark["weights"]:
+            if ticker not in ordered_tickers:
+                ordered_tickers.append(ticker)
+    return ordered_tickers
+
+
+def warn_on_non_liquid_required_assets(
+    required_tickers: list[str],
+    liquid_tickers: list[str],
+) -> list[str]:
+    """Log and return any configured strategy assets that fail the liquidity screen."""
+    liquid_set = set(liquid_tickers)
+    non_liquid_required = [ticker for ticker in required_tickers if ticker not in liquid_set]
+    if non_liquid_required:
+        LOGGER.warning(
+            "Configured strategy or benchmark assets failed the liquidity filter but will remain in the backtest universe: %s",
+            non_liquid_required,
+        )
+    return non_liquid_required
+
+
+def resolve_backtest_tickers(
+    required_tickers: list[str],
+    liquid_tickers: list[str],
+    mode: str = "configured",
+) -> list[str]:
+    """Resolve which tickers should be used in the backtest universe."""
+    normalized_mode = mode.lower()
+    if normalized_mode not in {"configured", "liquidity_filtered"}:
+        raise ValueError(
+            f"Unsupported backtest universe mode '{mode}'. Supported values: ['configured', 'liquidity_filtered']."
+        )
+
+    non_liquid_required = [ticker for ticker in required_tickers if ticker not in set(liquid_tickers)]
+    if normalized_mode == "configured":
+        return required_tickers
+
+    if non_liquid_required:
+        raise ValueError(
+            "Liquidity-filtered backtest mode cannot run because configured strategy or benchmark assets "
+            f"failed the liquidity screen: {non_liquid_required}"
+        )
+
+    return [ticker for ticker in required_tickers if ticker in set(liquid_tickers)]
+
+
+def write_liquidity_outputs(
+    liquid_tickers: list[str],
+    liquidity_table: pd.DataFrame,
+    etf_summary: pd.DataFrame,
+    output_dir: str | Path,
+) -> None:
+    """Persist liquidity summary outputs for audit and downstream use."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    liquidity_summary_path = output_path / "liquidity_summary.csv"
+    investable_universe_path = output_path / "investable_universe.csv"
+    etf_summary_path = output_path / "etf_summary.csv"
+
+    liquidity_table.to_csv(liquidity_summary_path, index=True)
+    etf_summary.to_csv(etf_summary_path, index=True)
+    investable_universe_path.write_text(
+        "ticker\n" + "\n".join(liquid_tickers) + ("\n" if liquid_tickers else ""),
+        encoding="utf-8",
+    )
+
+    LOGGER.info("Saved liquidity summary to %s", liquidity_summary_path)
+    LOGGER.info("Saved ETF summary to %s", etf_summary_path)
+    LOGGER.info("Saved investable universe to %s", investable_universe_path)
+
+
+def run_strategy_backtests(
+    asset_returns: pd.DataFrame,
+    portfolio_template_config: str | Path,
+    benchmark_config: str | Path,
+    rebalance_config: str | Path,
+    template_name: str | None = None,
+) -> tuple[str, dict[str, pd.Series | pd.DataFrame], dict[str, dict[str, pd.Series | pd.DataFrame]]]:
+    """Run the default strategy portfolio and configured benchmarks."""
+    strategy_name = template_name or "balanced"
+    strategy_weights = load_portfolio_template(portfolio_template_config, strategy_name if template_name else None)
+    benchmark_weights = load_benchmarks(benchmark_config)
+    rebalance_frequency = load_standard_rebalance_frequency(rebalance_config)
+    one_way_bps = load_one_way_transaction_cost_bps(rebalance_config)
+
+    benchmark_results: dict[str, dict[str, pd.Series | pd.DataFrame]] = {}
+    benchmark_return_series: dict[str, pd.Series] = {}
+
+    for benchmark_name, config in benchmark_weights.items():
+        result = run_fixed_weight_backtest(
+            asset_returns,
+            config["weights"],
+            rebalance_frequency=rebalance_frequency,
+            one_way_bps=one_way_bps,
+        )
+        benchmark_results[benchmark_name] = result
+        benchmark_return_series[benchmark_name] = result["portfolio_returns"]
+
+    strategy_result = run_fixed_weight_backtest(
+        asset_returns,
+        strategy_weights,
+        rebalance_frequency=rebalance_frequency,
+        one_way_bps=one_way_bps,
+        benchmark_returns=benchmark_return_series,
+    )
+    return strategy_name, strategy_result, benchmark_results
+
+
+def build_backtest_policy_tables(
+    strategy_name: str,
+    portfolio_template_config: str | Path,
+    benchmark_config: str | Path,
+    liquid_tickers: list[str],
+    template_name: str | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Build detailed and summary tables for backtest-universe policy validation."""
+    strategy_weights = load_portfolio_template(
+        portfolio_template_config,
+        template_name if template_name else None,
+    )
+    benchmark_weights = load_benchmarks(benchmark_config)
+    validation = build_backtest_universe_validation(
+        strategy_name=strategy_name,
+        strategy_weights=strategy_weights,
+        benchmark_weights=benchmark_weights,
+        liquid_tickers=liquid_tickers,
+    )
+    summary = summarize_backtest_universe_validation(validation)
+    return validation, summary
+
+
+def build_performance_summary(
+    strategy_name: str,
+    strategy_result: dict[str, pd.Series | pd.DataFrame],
+    benchmark_results: dict[str, dict[str, pd.Series | pd.DataFrame]],
+) -> pd.DataFrame:
+    """Build a compact performance summary across the strategy and benchmarks."""
+    rows: dict[str, pd.Series] = {}
+
+    strategy_summary = strategy_result["summary"].copy()
+    strategy_summary["ending_nav"] = float(strategy_result["portfolio_nav"].iloc[-1])
+    strategy_summary["total_turnover"] = float(strategy_result["turnover"].sum())
+    strategy_summary["total_transaction_cost_drag"] = float(strategy_result["transaction_costs"].sum())
+    rows[strategy_name] = strategy_summary
+
+    for benchmark_name, result in benchmark_results.items():
+        benchmark_summary = result["summary"].copy()
+        benchmark_summary["ending_nav"] = float(result["portfolio_nav"].iloc[-1])
+        benchmark_summary["total_turnover"] = float(result["turnover"].sum())
+        benchmark_summary["total_transaction_cost_drag"] = float(result["transaction_costs"].sum())
+        rows[benchmark_name] = benchmark_summary
+
+    return pd.DataFrame(rows).T
+
+
+def build_turnover_summary(
+    strategy_name: str,
+    strategy_result: dict[str, pd.Series | pd.DataFrame],
+    benchmark_results: dict[str, dict[str, pd.Series | pd.DataFrame]],
+) -> pd.DataFrame:
+    """Build a turnover-focused summary across the strategy and benchmarks."""
+    rows: list[dict[str, float | str]] = []
+
+    all_results = {strategy_name: strategy_result, **benchmark_results}
+    for name, result in all_results.items():
+        rows.append(
+            {
+                "portfolio": name,
+                "total_turnover": float(result["turnover"].sum()),
+                "average_turnover": float(result["turnover"].mean()),
+                "rebalance_count": int(result["rebalance_flags"].sum()),
+                "total_transaction_cost_drag": float(result["transaction_costs"].sum()),
+            }
+        )
+
+    return pd.DataFrame(rows).set_index("portfolio")
+
+
+def write_backtest_outputs(
+    strategy_name: str,
+    strategy_result: dict[str, pd.Series | pd.DataFrame],
+    benchmark_results: dict[str, dict[str, pd.Series | pd.DataFrame]],
+    policy_validation: pd.DataFrame,
+    policy_summary: pd.DataFrame,
+    output_dir: str | Path,
+) -> None:
+    """Persist backtest outputs for the strategy and benchmarks."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    performance_summary = build_performance_summary(strategy_name, strategy_result, benchmark_results)
+    turnover_summary = build_turnover_summary(strategy_name, strategy_result, benchmark_results)
+    annual_return_table = strategy_result["annual_return_table"]
+    benchmark_comparisons = strategy_result["benchmark_comparisons"]
+    nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
+    return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
+
+    performance_summary.to_csv(output_path / "performance_summary.csv", index=True)
+    turnover_summary.to_csv(output_path / "turnover_summary.csv", index=True)
+    annual_return_table.to_csv(output_path / "annual_return_table.csv", index=True)
+    benchmark_comparisons.to_csv(output_path / "benchmark_comparisons.csv", index=True)
+    nav_table.to_csv(output_path / "nav_series.csv", index=True)
+    return_table.to_csv(output_path / "return_series.csv", index=True)
+    policy_validation.to_csv(output_path / "backtest_universe_validation.csv", index=True)
+    policy_summary.to_csv(output_path / "backtest_universe_policy_summary.csv", index=True)
+
+    LOGGER.info("Saved performance summary to %s", output_path / "performance_summary.csv")
+    LOGGER.info("Saved turnover summary to %s", output_path / "turnover_summary.csv")
+    LOGGER.info("Saved annual return table to %s", output_path / "annual_return_table.csv")
+    LOGGER.info("Saved benchmark comparisons to %s", output_path / "benchmark_comparisons.csv")
+
+
+def build_nav_table(
+    strategy_name: str,
+    strategy_result: dict[str, pd.Series | pd.DataFrame],
+    benchmark_results: dict[str, dict[str, pd.Series | pd.DataFrame]],
+) -> pd.DataFrame:
+    """Build a NAV table for the strategy and benchmarks."""
+    return pd.DataFrame(
+        {
+            strategy_name: strategy_result["portfolio_nav"],
+            **{name: result["portfolio_nav"] for name, result in benchmark_results.items()},
+        }
+    )
+
+
+def build_return_table(
+    strategy_name: str,
+    strategy_result: dict[str, pd.Series | pd.DataFrame],
+    benchmark_results: dict[str, dict[str, pd.Series | pd.DataFrame]],
+) -> pd.DataFrame:
+    """Build a return table for the strategy and benchmarks."""
+    return pd.DataFrame(
+        {
+            strategy_name: strategy_result["portfolio_returns"],
+            **{name: result["portfolio_returns"] for name, result in benchmark_results.items()},
+        }
+    )
+
+
+def build_argument_parser() -> argparse.ArgumentParser:
+    """Build the CLI for the Phase 1 pipeline runner."""
+    parser = argparse.ArgumentParser(description="Run the Phase 1 ETF data pipeline.")
+    parser.add_argument("--universe-config", default="config/etf_universe.yaml")
+    parser.add_argument("--portfolio-config", default="config/portfolio_templates.yaml")
+    parser.add_argument("--benchmark-config", default="config/benchmark_config.yaml")
+    parser.add_argument("--rebalance-config", default="config/rebalance_rules.yaml")
+    parser.add_argument("--template-name", default=None)
+    parser.add_argument("--start", required=True, help="Inclusive start date in YYYY-MM-DD format.")
+    parser.add_argument("--end", default=None, help="Exclusive end date in YYYY-MM-DD format.")
+    parser.add_argument("--raw-dir", default="data/raw")
+    parser.add_argument("--processed-dir", default="data/processed")
+    parser.add_argument("--output-dir", default="outputs/tables")
+    parser.add_argument("--figure-dir", default="outputs/figures")
+    parser.add_argument("--report-dir", default="outputs/reports")
+    parser.add_argument(
+        "--backtest-universe-mode",
+        default="configured",
+        choices=["configured", "liquidity_filtered"],
+        help="Use the full configured portfolio universe or require all backtest assets to pass the liquidity screen.",
+    )
+    parser.add_argument("--log-level", default="INFO")
+    return parser
+
+
+def main() -> None:
+    """Execute the Phase 1 data pipeline."""
+    parser = build_argument_parser()
+    args = parser.parse_args()
+
+    configure_logging(args.log_level)
+    args.start, args.end = validate_date_range(args.start, args.end)
+
+    tickers = load_enabled_tickers(args.universe_config)
+    LOGGER.info("Loaded %s enabled tickers from %s", len(tickers), args.universe_config)
+
+    raw_frames = fetch_prices(
+        tickers=tickers,
+        start=args.start,
+        end=args.end,
+        output_dir=args.raw_dir,
+        save_raw=True,
+    )
+    clean_frames = batch_clean_price_frames(raw_frames)
+    save_processed_frames(clean_frames, args.processed_dir)
+
+    liquid_tickers, liquidity_table = filter_liquid_universe(clean_frames)
+    etf_summary = score_etf_universe(args.universe_config, liquidity_table)
+    write_liquidity_outputs(liquid_tickers, liquidity_table, etf_summary, args.output_dir)
+
+    required_backtest_tickers = collect_required_backtest_tickers(
+        args.portfolio_config,
+        args.benchmark_config,
+        template_name=args.template_name,
+    )
+    non_liquid_required_assets = warn_on_non_liquid_required_assets(required_backtest_tickers, liquid_tickers)
+    backtest_tickers = resolve_backtest_tickers(
+        required_backtest_tickers,
+        liquid_tickers,
+        mode=args.backtest_universe_mode,
+    )
+
+    asset_returns = build_asset_return_matrix(clean_frames, tickers=backtest_tickers)
+    strategy_name, strategy_result, benchmark_results = run_strategy_backtests(
+        asset_returns,
+        portfolio_template_config=args.portfolio_config,
+        benchmark_config=args.benchmark_config,
+        rebalance_config=args.rebalance_config,
+        template_name=args.template_name,
+    )
+    policy_validation, policy_summary = build_backtest_policy_tables(
+        strategy_name=strategy_name,
+        portfolio_template_config=args.portfolio_config,
+        benchmark_config=args.benchmark_config,
+        liquid_tickers=liquid_tickers,
+        template_name=args.template_name,
+    )
+    write_backtest_outputs(
+        strategy_name,
+        strategy_result,
+        benchmark_results,
+        policy_validation,
+        policy_summary,
+        args.output_dir,
+    )
+    chart_paths = write_phase1_chart_outputs(
+        strategy_name,
+        build_nav_table(strategy_name, strategy_result, benchmark_results),
+        strategy_result["annual_return_table"],
+        asset_returns,
+        args.figure_dir,
+    )
+    LOGGER.info("Saved Phase 1 charts: %s", chart_paths)
+
+    performance_summary = build_performance_summary(strategy_name, strategy_result, benchmark_results)
+    turnover_summary = build_turnover_summary(strategy_name, strategy_result, benchmark_results)
+    report_notes = []
+    if non_liquid_required_assets:
+        report_notes.append(
+            "Configured strategy or benchmark assets failed the liquidity screen but were retained in the backtest: "
+            + ", ".join(non_liquid_required_assets)
+        )
+    report_notes.append(f"Backtest universe mode: {args.backtest_universe_mode}")
+    report_path = write_phase1_report(
+        strategy_name=strategy_name,
+        performance_summary=performance_summary,
+        turnover_summary=turnover_summary,
+        annual_return_table=strategy_result["annual_return_table"],
+        benchmark_comparisons=strategy_result["benchmark_comparisons"],
+        liquidity_table=liquidity_table,
+        etf_summary=etf_summary,
+        chart_paths=chart_paths,
+        output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.md",
+        report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
+        notes=report_notes,
+    )
+    LOGGER.info("Saved Phase 1 report to %s", report_path)
+
+    LOGGER.info("Selected %s liquid tickers: %s", len(liquid_tickers), liquid_tickers)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,32 @@
+default_template: balanced
+templates:
+  conservative:
+    description: Conservative strategic allocation
+    weights:
+      VTI: 0.25
+      VEA: 0.10
+      IEMG: 0.05
+      AGG: 0.30
+      BNDX: 0.15
+      GLD: 0.10
+      VNQ: 0.05
+  balanced:
+    description: Default strategic allocation
+    weights:
+      VTI: 0.35
+      VEA: 0.15
+      IEMG: 0.10
+      AGG: 0.20
+      BNDX: 0.10
+      GLD: 0.05
+      VNQ: 0.05
+  growth:
+    description: Growth-oriented strategic allocation
+    weights:
+      VTI: 0.45
+      VEA: 0.20
+      IEMG: 0.10
+      AGG: 0.10
+      BNDX: 0.05
+      GLD: 0.05
+      VNQ: 0.05

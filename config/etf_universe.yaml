@@ -1,0 +1,32 @@
+universe_name: phase_1_core
+default_currency: USD
+liquidity_focus: daily_dollar_volume
+tickers:
+  VTI:
+    enabled: true
+    asset_class: us_equity
+    description: US total market equity
+  VEA:
+    enabled: true
+    asset_class: developed_equity_ex_us
+    description: Developed markets ex-US equity
+  IEMG:
+    enabled: true
+    asset_class: emerging_equity
+    description: Emerging markets equity
+  AGG:
+    enabled: true
+    asset_class: us_aggregate_bond
+    description: US aggregate bond
+  BNDX:
+    enabled: true
+    asset_class: international_aggregate_bond
+    description: International aggregate bond
+  GLD:
+    enabled: true
+    asset_class: gold
+    description: Gold
+  VNQ:
+    enabled: true
+    asset_class: us_reit
+    description: US REITs

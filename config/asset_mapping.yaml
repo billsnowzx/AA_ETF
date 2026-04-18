@@ -1,0 +1,29 @@
+asset_mapping:
+  us_equity:
+    tickers:
+      - VTI
+    label: US Equity
+  developed_equity_ex_us:
+    tickers:
+      - VEA
+    label: Developed Equity ex-US
+  emerging_equity:
+    tickers:
+      - IEMG
+    label: Emerging Equity
+  us_aggregate_bond:
+    tickers:
+      - AGG
+    label: US Aggregate Bond
+  international_aggregate_bond:
+    tickers:
+      - BNDX
+    label: International Aggregate Bond
+  gold:
+    tickers:
+      - GLD
+    label: Gold
+  us_reit:
+    tickers:
+      - VNQ
+    label: US REIT

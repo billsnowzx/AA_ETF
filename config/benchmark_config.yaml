@@ -1,0 +1,18 @@
+benchmarks:
+  benchmark_a:
+    name: Traditional US 60/40
+    description: US equity and US aggregate bond benchmark
+    weights:
+      VTI: 0.60
+      AGG: 0.40
+  benchmark_b:
+    name: Global static diversified benchmark
+    description: Global diversified benchmark aligned with the balanced template
+    weights:
+      VTI: 0.35
+      VEA: 0.15
+      IEMG: 0.10
+      AGG: 0.20
+      BNDX: 0.10
+      GLD: 0.05
+      VNQ: 0.05
