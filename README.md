@@ -102,9 +102,10 @@ This command will:
 - run the default strategic portfolio plus configured benchmarks
 - generate `performance_summary.csv`, `annual_return_table.csv`, `turnover_summary.csv`, `benchmark_comparisons.csv`, `nav_series.csv`, and `return_series.csv`
 - generate `covariance_matrix.csv`, `correlation_matrix.csv`, `covariance_pairs.csv`, and `correlation_pairs.csv`
+- generate `top_correlation_pairs.csv` and `asset_risk_snapshot.csv`
 - generate `backtest_universe_validation.csv` and `backtest_universe_policy_summary.csv`
 - generate the required Phase 1 charts under `outputs/figures/`
-- generate a Markdown report under `outputs/reports/`
+- generate Markdown and HTML reports under `outputs/reports/`
 
 Optional policy:
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from html import escape
 from pathlib import Path
 
 import pandas as pd
@@ -35,6 +36,25 @@ def dataframe_to_markdown_table(frame: pd.DataFrame) -> str:
         lines.append("| " + " | ".join(values) + " |")
 
     return "\n".join(lines)
+
+
+def dataframe_to_html_table(frame: pd.DataFrame) -> str:
+    """Render a DataFrame as a compact HTML table."""
+    table = frame.copy()
+    header_cells = "".join(f"<th>{escape(str(column))}</th>" for column in ["index", *table.columns.tolist()])
+    body_rows = []
+
+    for index, row in table.iterrows():
+        value_cells = "".join(f"<td>{escape(str(value))}</td>" for value in [index, *row.tolist()])
+        body_rows.append(f"<tr>{value_cells}</tr>")
+
+    body = "".join(body_rows)
+    return (
+        "<table>"
+        f"<thead><tr>{header_cells}</tr></thead>"
+        f"<tbody>{body}</tbody>"
+        "</table>"
+    )
 
 
 def build_top_correlation_summary(
@@ -82,6 +102,18 @@ def build_asset_risk_snapshot(
     snapshot["avg_correlation"] = snapshot["avg_correlation"].map(_format_decimal)
     snapshot["variance"] = snapshot["variance"].map(lambda value: _format_decimal(value, digits=6))
     return snapshot
+
+
+def build_phase1_risk_summary_tables(
+    correlation_pairs: pd.DataFrame,
+    correlation_matrix: pd.DataFrame,
+    covariance_matrix: pd.DataFrame,
+) -> dict[str, pd.DataFrame]:
+    """Build report-facing risk summary tables in reusable tabular form."""
+    return {
+        "top_correlation_pairs": build_top_correlation_summary(correlation_pairs),
+        "asset_risk_snapshot": build_asset_risk_snapshot(correlation_matrix, covariance_matrix),
+    }
 
 
 def build_phase1_report_markdown(
@@ -153,8 +185,13 @@ def build_phase1_report_markdown(
     etf_view["recent_pass_ratio"] = etf_view["recent_pass_ratio"].map(_format_percent)
     etf_view["phase1_total_score"] = etf_view["phase1_total_score"].map(_format_decimal)
 
-    correlation_summary = build_top_correlation_summary(correlation_pairs)
-    asset_risk_snapshot = build_asset_risk_snapshot(correlation_matrix, covariance_matrix)
+    risk_summary_tables = build_phase1_risk_summary_tables(
+        correlation_pairs=correlation_pairs,
+        correlation_matrix=correlation_matrix,
+        covariance_matrix=covariance_matrix,
+    )
+    correlation_summary = risk_summary_tables["top_correlation_pairs"]
+    asset_risk_snapshot = risk_summary_tables["asset_risk_snapshot"]
 
     note_lines = "\n".join(f"- {note}" for note in notes) if notes else "- None"
     figure_lines = "\n".join(f"- `{name}`: `{path.as_posix()}`" for name, path in chart_paths.items())
@@ -212,6 +249,140 @@ Generated: {report_date}
     return report
 
 
+def build_phase1_report_html(
+    strategy_name: str,
+    performance_summary: pd.DataFrame,
+    turnover_summary: pd.DataFrame,
+    annual_return_table: pd.DataFrame,
+    benchmark_comparisons: pd.DataFrame,
+    liquidity_table: pd.DataFrame,
+    etf_summary: pd.DataFrame,
+    covariance_matrix: pd.DataFrame,
+    correlation_matrix: pd.DataFrame,
+    correlation_pairs: pd.DataFrame,
+    chart_paths: dict[str, Path],
+    report_date: str,
+    notes: list[str] | None = None,
+) -> str:
+    """Build a shareable HTML report from Phase 1 pipeline outputs."""
+    strategy_row = performance_summary.loc[strategy_name]
+    investable = liquidity_table.index[liquidity_table["passes_liquidity_filter"]].tolist()
+    non_liquid = liquidity_table.index[~liquidity_table["passes_liquidity_filter"]].tolist()
+
+    performance_view = performance_summary.copy()
+    for column in [
+        "annualized_return",
+        "annualized_volatility",
+        "downside_volatility",
+        "sharpe_ratio",
+        "sortino_ratio",
+        "max_drawdown",
+        "calmar_ratio",
+        "ending_nav",
+        "total_turnover",
+        "total_transaction_cost_drag",
+    ]:
+        if column in performance_view.columns:
+            formatter = _format_percent if "return" in column or "volatility" in column or "drawdown" in column or "drag" in column else _format_decimal
+            if column in {"ending_nav", "total_turnover", "sharpe_ratio", "sortino_ratio", "calmar_ratio"}:
+                formatter = _format_decimal
+            performance_view[column] = performance_view[column].map(formatter)
+
+    turnover_view = turnover_summary.copy()
+    for column in ["total_turnover", "average_turnover", "total_transaction_cost_drag"]:
+        if column in turnover_view.columns:
+            turnover_view[column] = turnover_view[column].map(_format_decimal)
+
+    annual_view = annual_return_table.copy()
+    for column in annual_view.columns:
+        annual_view[column] = annual_view[column].map(_format_percent)
+
+    benchmark_view = benchmark_comparisons.copy()
+    for column in benchmark_view.columns:
+        if "ratio" in column:
+            benchmark_view[column] = benchmark_view[column].map(_format_decimal)
+        else:
+            benchmark_view[column] = benchmark_view[column].map(_format_percent)
+
+    etf_view = etf_summary[
+        [
+            "asset_class",
+            "average_dollar_volume",
+            "recent_pass_ratio",
+            "passes_liquidity_filter",
+            "phase1_total_score",
+            "phase1_rank",
+        ]
+    ].copy()
+    etf_view["average_dollar_volume"] = etf_view["average_dollar_volume"].map(lambda value: _format_decimal(value, digits=0))
+    etf_view["recent_pass_ratio"] = etf_view["recent_pass_ratio"].map(_format_percent)
+    etf_view["phase1_total_score"] = etf_view["phase1_total_score"].map(_format_decimal)
+
+    risk_summary_tables = build_phase1_risk_summary_tables(
+        correlation_pairs=correlation_pairs,
+        correlation_matrix=correlation_matrix,
+        covariance_matrix=covariance_matrix,
+    )
+    correlation_summary = risk_summary_tables["top_correlation_pairs"]
+    asset_risk_snapshot = risk_summary_tables["asset_risk_snapshot"]
+
+    note_items = "".join(f"<li>{escape(note)}</li>" for note in notes) if notes else "<li>None</li>"
+    figure_items = "".join(
+        f"<li><strong>{escape(name)}</strong>: {escape(path.as_posix())}</li>"
+        for name, path in chart_paths.items()
+    )
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Phase 1 Pipeline Report</title>
+  <style>
+    body {{ font-family: Georgia, 'Times New Roman', serif; margin: 32px; color: #1f2933; background: #f7f5ef; }}
+    h1, h2 {{ color: #102a43; }}
+    .summary {{ background: #fffdf7; border: 1px solid #d9d0bb; padding: 16px 20px; margin-bottom: 24px; }}
+    table {{ border-collapse: collapse; width: 100%; margin: 12px 0 24px; background: white; }}
+    th, td {{ border: 1px solid #d9d0bb; padding: 8px 10px; text-align: left; }}
+    th {{ background: #efe7d3; }}
+    ul {{ margin-top: 8px; }}
+    .meta {{ color: #486581; }}
+  </style>
+</head>
+<body>
+  <h1>Phase 1 Pipeline Report</h1>
+  <p class="meta">Generated: {escape(report_date)}</p>
+
+  <section class="summary">
+    <h2>Executive Summary</h2>
+    <ul>
+      <li>Strategy: <code>{escape(strategy_name)}</code></li>
+      <li>Ending NAV: {_format_decimal(strategy_row["ending_nav"])}</li>
+      <li>Annualized return: {_format_percent(strategy_row["annualized_return"])}</li>
+      <li>Annualized volatility: {_format_percent(strategy_row["annualized_volatility"])}</li>
+      <li>Max drawdown: {_format_percent(strategy_row["max_drawdown"])}</li>
+      <li>Investable liquidity-passing ETFs: {escape(", ".join(investable) if investable else "None")}</li>
+      <li>Liquidity-screen failures: {escape(", ".join(non_liquid) if non_liquid else "None")}</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Notes</h2>
+    <ul>{note_items}</ul>
+  </section>
+
+  <section><h2>Performance Summary</h2>{dataframe_to_html_table(performance_view)}</section>
+  <section><h2>Turnover Summary</h2>{dataframe_to_html_table(turnover_view)}</section>
+  <section><h2>Annual Return Table</h2>{dataframe_to_html_table(annual_view)}</section>
+  <section><h2>Benchmark Comparisons</h2>{dataframe_to_html_table(benchmark_view) if not benchmark_view.empty else "<p>No benchmark comparisons generated.</p>"}</section>
+  <section><h2>ETF Summary</h2>{dataframe_to_html_table(etf_view)}</section>
+  <section><h2>Correlation Highlights</h2>{dataframe_to_html_table(correlation_summary) if not correlation_summary.empty else "<p>No non-diagonal correlation pairs available.</p>"}</section>
+  <section><h2>Asset Risk Snapshot</h2>{dataframe_to_html_table(asset_risk_snapshot) if not asset_risk_snapshot.empty else "<p>No asset risk snapshot available.</p>"}</section>
+  <section><h2>Figures</h2><ul>{figure_items}</ul></section>
+</body>
+</html>
+"""
+
+
 def write_phase1_report(
     strategy_name: str,
     performance_summary: pd.DataFrame,
@@ -232,6 +403,44 @@ def write_phase1_report(
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     report = build_phase1_report_markdown(
+        strategy_name=strategy_name,
+        performance_summary=performance_summary,
+        turnover_summary=turnover_summary,
+        annual_return_table=annual_return_table,
+        benchmark_comparisons=benchmark_comparisons,
+        liquidity_table=liquidity_table,
+        etf_summary=etf_summary,
+        covariance_matrix=covariance_matrix,
+        correlation_matrix=correlation_matrix,
+        correlation_pairs=correlation_pairs,
+        chart_paths=chart_paths,
+        report_date=report_date,
+        notes=notes,
+    )
+    output.write_text(report, encoding="utf-8")
+    return output
+
+
+def write_phase1_html_report(
+    strategy_name: str,
+    performance_summary: pd.DataFrame,
+    turnover_summary: pd.DataFrame,
+    annual_return_table: pd.DataFrame,
+    benchmark_comparisons: pd.DataFrame,
+    liquidity_table: pd.DataFrame,
+    etf_summary: pd.DataFrame,
+    covariance_matrix: pd.DataFrame,
+    correlation_matrix: pd.DataFrame,
+    correlation_pairs: pd.DataFrame,
+    chart_paths: dict[str, Path],
+    output_path: str | Path,
+    report_date: str,
+    notes: list[str] | None = None,
+) -> Path:
+    """Write the Phase 1 HTML report to disk."""
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    report = build_phase1_report_html(
         strategy_name=strategy_name,
         performance_summary=performance_summary,
         turnover_summary=turnover_summary,

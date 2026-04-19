@@ -155,11 +155,15 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert "benchmark_b" in return_table.columns
         assert "covariance_matrix" in risk_outputs
         assert "correlation_pairs" in risk_outputs
+        assert "top_correlation_pairs" in risk_outputs
+        assert "asset_risk_snapshot" in risk_outputs
         assert (output_dir / "performance_summary.csv").exists()
         assert (output_dir / "annual_return_table.csv").exists()
         assert (output_dir / "nav_series.csv").exists()
         assert (output_dir / "backtest_universe_validation.csv").exists()
         assert (output_dir / "covariance_matrix.csv").exists()
         assert (output_dir / "correlation_pairs.csv").exists()
+        assert (output_dir / "top_correlation_pairs.csv").exists()
+        assert (output_dir / "asset_risk_snapshot.csv").exists()
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)

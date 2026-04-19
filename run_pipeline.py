@@ -19,7 +19,11 @@ from src.backtest.engine import run_fixed_weight_backtest
 from src.data.clean_data import batch_clean_price_frames
 from src.data.fetch_prices import fetch_prices
 from src.dashboard.plots import write_phase1_chart_outputs
-from src.dashboard.reporting import write_phase1_report
+from src.dashboard.reporting import (
+    build_phase1_risk_summary_tables,
+    write_phase1_html_report,
+    write_phase1_report,
+)
 from src.portfolio.benchmarks import load_benchmarks
 from src.portfolio.policy import (
     build_backtest_universe_validation,
@@ -264,11 +268,18 @@ def build_risk_matrix_outputs(asset_returns: pd.DataFrame) -> dict[str, pd.DataF
     """Build covariance and correlation outputs in matrix and long-table forms."""
     covariance = covariance_matrix(asset_returns)
     correlation = correlation_matrix(asset_returns)
+    summary_tables = build_phase1_risk_summary_tables(
+        correlation_pairs=matrix_to_long_table(correlation, "correlation"),
+        correlation_matrix=correlation,
+        covariance_matrix=covariance,
+    )
     return {
         "covariance_matrix": covariance,
         "correlation_matrix": correlation,
         "covariance_pairs": matrix_to_long_table(covariance, "covariance"),
         "correlation_pairs": matrix_to_long_table(correlation, "correlation"),
+        "top_correlation_pairs": summary_tables["top_correlation_pairs"],
+        "asset_risk_snapshot": summary_tables["asset_risk_snapshot"],
     }
 
 
@@ -305,6 +316,8 @@ def write_backtest_outputs(
     risk_outputs["correlation_matrix"].to_csv(output_path / "correlation_matrix.csv", index=True)
     risk_outputs["covariance_pairs"].to_csv(output_path / "covariance_pairs.csv", index=False)
     risk_outputs["correlation_pairs"].to_csv(output_path / "correlation_pairs.csv", index=False)
+    risk_outputs["top_correlation_pairs"].to_csv(output_path / "top_correlation_pairs.csv", index=False)
+    risk_outputs["asset_risk_snapshot"].to_csv(output_path / "asset_risk_snapshot.csv", index=True)
 
     LOGGER.info("Saved performance summary to %s", output_path / "performance_summary.csv")
     LOGGER.info("Saved turnover summary to %s", output_path / "turnover_summary.csv")
@@ -312,6 +325,8 @@ def write_backtest_outputs(
     LOGGER.info("Saved benchmark comparisons to %s", output_path / "benchmark_comparisons.csv")
     LOGGER.info("Saved covariance matrix to %s", output_path / "covariance_matrix.csv")
     LOGGER.info("Saved correlation matrix to %s", output_path / "correlation_matrix.csv")
+    LOGGER.info("Saved top correlation pairs to %s", output_path / "top_correlation_pairs.csv")
+    LOGGER.info("Saved asset risk snapshot to %s", output_path / "asset_risk_snapshot.csv")
 
 
 def build_nav_table(
@@ -463,7 +478,24 @@ def main() -> None:
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         notes=report_notes,
     )
+    html_report_path = write_phase1_html_report(
+        strategy_name=strategy_name,
+        performance_summary=performance_summary,
+        turnover_summary=turnover_summary,
+        annual_return_table=strategy_result["annual_return_table"],
+        benchmark_comparisons=strategy_result["benchmark_comparisons"],
+        liquidity_table=liquidity_table,
+        etf_summary=etf_summary,
+        covariance_matrix=risk_outputs["covariance_matrix"],
+        correlation_matrix=risk_outputs["correlation_matrix"],
+        correlation_pairs=risk_outputs["correlation_pairs"],
+        chart_paths=chart_paths,
+        output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.html",
+        report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
+        notes=report_notes,
+    )
     LOGGER.info("Saved Phase 1 report to %s", report_path)
+    LOGGER.info("Saved Phase 1 HTML report to %s", html_report_path)
 
     LOGGER.info("Selected %s liquid tickers: %s", len(liquid_tickers), liquid_tickers)
 
