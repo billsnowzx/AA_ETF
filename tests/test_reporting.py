@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.dashboard.reporting import build_phase1_report_markdown, write_phase1_report
+from src.dashboard.reporting import (
+    build_asset_risk_snapshot,
+    build_phase1_report_markdown,
+    build_top_correlation_summary,
+    write_phase1_report,
+)
 
 
 def _sample_frame() -> pd.DataFrame:
@@ -53,6 +58,23 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         },
         index=pd.Index(["VTI"], name="ticker"),
     )
+    covariance_matrix = pd.DataFrame(
+        [[0.0004, 0.0001], [0.0001, 0.0002]],
+        index=["VTI", "AGG"],
+        columns=["VTI", "AGG"],
+    )
+    correlation_matrix = pd.DataFrame(
+        [[1.0, 0.25], [0.25, 1.0]],
+        index=["VTI", "AGG"],
+        columns=["VTI", "AGG"],
+    )
+    correlation_pairs = pd.DataFrame(
+        [
+            {"left": "VTI", "right": "VTI", "correlation": 1.0},
+            {"left": "VTI", "right": "AGG", "correlation": 0.25},
+            {"left": "AGG", "right": "AGG", "correlation": 1.0},
+        ]
+    )
     chart_paths = {"nav_chart": Path("outputs/figures/balanced_nav.png")}
 
     report = build_phase1_report_markdown(
@@ -63,6 +85,9 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         benchmark_comparisons=benchmark_comparisons,
         liquidity_table=liquidity_table,
         etf_summary=etf_summary,
+        covariance_matrix=covariance_matrix,
+        correlation_matrix=correlation_matrix,
+        correlation_pairs=correlation_pairs,
         chart_paths=chart_paths,
         report_date="2026-04-18",
         notes=["IAGG failed the liquidity filter"],
@@ -72,6 +97,34 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "## Executive Summary" in report
     assert "IAGG failed the liquidity filter" in report
     assert "balanced_nav.png" in report
+    assert "## Correlation Highlights" in report
+    assert "VTI vs AGG" in report
+
+
+def test_risk_summary_helpers_build_expected_tables() -> None:
+    correlation_pairs = pd.DataFrame(
+        [
+            {"left": "VTI", "right": "VTI", "correlation": 1.0},
+            {"left": "VTI", "right": "AGG", "correlation": 0.25},
+            {"left": "VTI", "right": "GLD", "correlation": -0.4},
+        ]
+    )
+    correlation_summary = build_top_correlation_summary(correlation_pairs, top_n=1)
+    assert correlation_summary.iloc[0]["pair"] == "VTI vs GLD"
+
+    correlation_matrix = pd.DataFrame(
+        [[1.0, 0.25], [0.25, 1.0]],
+        index=["VTI", "AGG"],
+        columns=["VTI", "AGG"],
+    )
+    covariance_matrix = pd.DataFrame(
+        [[0.0004, 0.0001], [0.0001, 0.0002]],
+        index=["VTI", "AGG"],
+        columns=["VTI", "AGG"],
+    )
+    snapshot = build_asset_risk_snapshot(correlation_matrix, covariance_matrix)
+    assert snapshot.loc["VTI", "avg_correlation"] == "0.2500"
+    assert snapshot.loc["AGG", "variance"] == "0.000200"
 
 
 def test_write_phase1_report_creates_markdown_file() -> None:
@@ -105,6 +158,22 @@ def test_write_phase1_report_creates_markdown_file() -> None:
         },
         index=pd.Index(["VTI"], name="ticker"),
     )
+    covariance_matrix = pd.DataFrame(
+        [[0.0004, 0.0001], [0.0001, 0.0002]],
+        index=["VTI", "AGG"],
+        columns=["VTI", "AGG"],
+    )
+    correlation_matrix = pd.DataFrame(
+        [[1.0, 0.25], [0.25, 1.0]],
+        index=["VTI", "AGG"],
+        columns=["VTI", "AGG"],
+    )
+    correlation_pairs = pd.DataFrame(
+        [
+            {"left": "VTI", "right": "VTI", "correlation": 1.0},
+            {"left": "VTI", "right": "AGG", "correlation": 0.25},
+        ]
+    )
 
     try:
         result = write_phase1_report(
@@ -115,6 +184,9 @@ def test_write_phase1_report_creates_markdown_file() -> None:
             benchmark_comparisons=benchmark_comparisons,
             liquidity_table=liquidity_table,
             etf_summary=etf_summary,
+            covariance_matrix=covariance_matrix,
+            correlation_matrix=correlation_matrix,
+            correlation_pairs=correlation_pairs,
             chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
             output_path=output_path,
             report_date="2026-04-18",

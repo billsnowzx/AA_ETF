@@ -6,6 +6,7 @@ from src.analytics.correlation import (
     build_adjusted_close_matrix,
     correlation_matrix,
     covariance_matrix,
+    matrix_to_long_table,
     return_matrix_from_prices,
     rolling_correlation,
 )
@@ -69,3 +70,17 @@ def test_rolling_correlation_requires_present_columns() -> None:
         assert "Missing columns" in str(exc)
     else:
         raise AssertionError("Expected ValueError for missing rolling correlation column.")
+
+
+def test_matrix_to_long_table_returns_upper_triangle_pairs() -> None:
+    matrix = pd.DataFrame(
+        [[1.0, 0.5], [0.5, 1.0]],
+        index=["VTI", "AGG"],
+        columns=["VTI", "AGG"],
+    )
+
+    pairs = matrix_to_long_table(matrix, "correlation", include_diagonal=False)
+
+    assert pairs.to_dict(orient="records") == [
+        {"left": "VTI", "right": "AGG", "correlation": 0.5},
+    ]

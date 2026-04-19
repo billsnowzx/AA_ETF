@@ -26,8 +26,8 @@ Phase 1 includes:
 Phase 1 intentionally excludes:
 
 - Optimization modules such as risk parity and Black-Litterman
-- Backtest engine implementation
-- Reporting and dashboard generation
+- Optimization-aware overlays and macro regime logic
+- Advanced optimization workflows and production dashboarding
 
 ## Repository layout
 
@@ -101,6 +101,7 @@ This command will:
 - generate `outputs/tables/investable_universe.csv`
 - run the default strategic portfolio plus configured benchmarks
 - generate `performance_summary.csv`, `annual_return_table.csv`, `turnover_summary.csv`, `benchmark_comparisons.csv`, `nav_series.csv`, and `return_series.csv`
+- generate `covariance_matrix.csv`, `correlation_matrix.csv`, `covariance_pairs.csv`, and `correlation_pairs.csv`
 - generate `backtest_universe_validation.csv` and `backtest_universe_policy_summary.csv`
 - generate the required Phase 1 charts under `outputs/figures/`
 - generate a Markdown report under `outputs/reports/`

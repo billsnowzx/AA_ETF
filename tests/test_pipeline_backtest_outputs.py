@@ -10,6 +10,7 @@ from run_pipeline import (
     build_nav_table,
     build_backtest_policy_tables,
     build_performance_summary,
+    build_risk_matrix_outputs,
     build_return_table,
     build_turnover_summary,
     collect_required_backtest_tickers,
@@ -135,6 +136,7 @@ def test_build_summary_tables_and_write_outputs() -> None:
     turnover_summary = build_turnover_summary(strategy_name, strategy_result, benchmark_results)
     nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
+    risk_outputs = build_risk_matrix_outputs(asset_returns)
 
     output_dir = Path("data/cache") / f"test_pipeline_outputs_{uuid.uuid4().hex}"
     try:
@@ -144,15 +146,20 @@ def test_build_summary_tables_and_write_outputs() -> None:
             benchmark_results,
             policy_validation,
             policy_summary,
+            asset_returns,
             output_dir,
         )
         assert strategy_name in performance_summary.index
         assert "benchmark_a" in turnover_summary.index
         assert strategy_name in nav_table.columns
         assert "benchmark_b" in return_table.columns
+        assert "covariance_matrix" in risk_outputs
+        assert "correlation_pairs" in risk_outputs
         assert (output_dir / "performance_summary.csv").exists()
         assert (output_dir / "annual_return_table.csv").exists()
         assert (output_dir / "nav_series.csv").exists()
         assert (output_dir / "backtest_universe_validation.csv").exists()
+        assert (output_dir / "covariance_matrix.csv").exists()
+        assert (output_dir / "correlation_pairs.csv").exists()
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)

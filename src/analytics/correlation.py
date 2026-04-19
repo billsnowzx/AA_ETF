@@ -53,6 +53,41 @@ def correlation_matrix(
     return returns.corr(min_periods=min_periods)
 
 
+def matrix_to_long_table(
+    matrix: pd.DataFrame,
+    value_name: str,
+    include_diagonal: bool = True,
+) -> pd.DataFrame:
+    """Flatten a symmetric matrix into an auditable upper-triangle table."""
+    if matrix.empty:
+        return pd.DataFrame(columns=["left", "right", value_name])
+
+    rows: list[dict[str, float | str]] = []
+    columns = list(matrix.columns)
+
+    for left_index, left in enumerate(columns):
+        if left not in matrix.index:
+            raise ValueError(f"Matrix index is missing label '{left}'.")
+
+        for right_index, right in enumerate(columns):
+            if right not in matrix.index:
+                raise ValueError(f"Matrix index is missing label '{right}'.")
+            if right_index < left_index:
+                continue
+            if not include_diagonal and left_index == right_index:
+                continue
+
+            rows.append(
+                {
+                    "left": left,
+                    "right": right,
+                    value_name: float(matrix.loc[left, right]),
+                }
+            )
+
+    return pd.DataFrame(rows)
+
+
 def rolling_correlation(
     returns: pd.DataFrame,
     left: str,

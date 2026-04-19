@@ -37,6 +37,53 @@ def dataframe_to_markdown_table(frame: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+def build_top_correlation_summary(
+    correlation_pairs: pd.DataFrame,
+    top_n: int = 5,
+) -> pd.DataFrame:
+    """Build a small summary of the strongest non-diagonal correlations."""
+    if correlation_pairs.empty:
+        return pd.DataFrame(columns=["pair", "correlation"])
+
+    working = correlation_pairs.copy()
+    if {"left", "right", "correlation"} - set(working.columns):
+        raise ValueError("Correlation pair table must contain 'left', 'right', and 'correlation' columns.")
+
+    working = working.loc[working["left"] != working["right"]].copy()
+    if working.empty:
+        return pd.DataFrame(columns=["pair", "correlation"])
+
+    working["abs_correlation"] = working["correlation"].abs()
+    working["pair"] = working["left"] + " vs " + working["right"]
+    working = working.sort_values(["abs_correlation", "pair"], ascending=[False, True])
+    summary = working[["pair", "correlation"]].head(top_n).copy()
+    summary["correlation"] = summary["correlation"].map(_format_decimal)
+    return summary
+
+
+def build_asset_risk_snapshot(
+    correlation_matrix: pd.DataFrame,
+    covariance_matrix: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build a per-asset snapshot from correlation and covariance matrices."""
+    if correlation_matrix.empty or covariance_matrix.empty:
+        return pd.DataFrame(columns=["avg_correlation", "variance"])
+
+    avg_correlation = {}
+    for asset in correlation_matrix.columns:
+        peer_values = correlation_matrix.loc[asset].drop(labels=[asset], errors="ignore")
+        avg_correlation[asset] = float(peer_values.mean()) if not peer_values.empty else float("nan")
+
+    variance = pd.Series(
+        {asset: float(covariance_matrix.loc[asset, asset]) for asset in covariance_matrix.columns},
+        name="variance",
+    )
+    snapshot = pd.DataFrame({"avg_correlation": pd.Series(avg_correlation), "variance": variance})
+    snapshot["avg_correlation"] = snapshot["avg_correlation"].map(_format_decimal)
+    snapshot["variance"] = snapshot["variance"].map(lambda value: _format_decimal(value, digits=6))
+    return snapshot
+
+
 def build_phase1_report_markdown(
     strategy_name: str,
     performance_summary: pd.DataFrame,
@@ -45,6 +92,9 @@ def build_phase1_report_markdown(
     benchmark_comparisons: pd.DataFrame,
     liquidity_table: pd.DataFrame,
     etf_summary: pd.DataFrame,
+    covariance_matrix: pd.DataFrame,
+    correlation_matrix: pd.DataFrame,
+    correlation_pairs: pd.DataFrame,
     chart_paths: dict[str, Path],
     report_date: str,
     notes: list[str] | None = None,
@@ -103,6 +153,9 @@ def build_phase1_report_markdown(
     etf_view["recent_pass_ratio"] = etf_view["recent_pass_ratio"].map(_format_percent)
     etf_view["phase1_total_score"] = etf_view["phase1_total_score"].map(_format_decimal)
 
+    correlation_summary = build_top_correlation_summary(correlation_pairs)
+    asset_risk_snapshot = build_asset_risk_snapshot(correlation_matrix, covariance_matrix)
+
     note_lines = "\n".join(f"- {note}" for note in notes) if notes else "- None"
     figure_lines = "\n".join(f"- `{name}`: `{path.as_posix()}`" for name, path in chart_paths.items())
 
@@ -144,6 +197,14 @@ Generated: {report_date}
 
 {dataframe_to_markdown_table(etf_view)}
 
+## Correlation Highlights
+
+{dataframe_to_markdown_table(correlation_summary) if not correlation_summary.empty else "No non-diagonal correlation pairs available."}
+
+## Asset Risk Snapshot
+
+{dataframe_to_markdown_table(asset_risk_snapshot) if not asset_risk_snapshot.empty else "No asset risk snapshot available."}
+
 ## Figures
 
 {figure_lines}
@@ -159,6 +220,9 @@ def write_phase1_report(
     benchmark_comparisons: pd.DataFrame,
     liquidity_table: pd.DataFrame,
     etf_summary: pd.DataFrame,
+    covariance_matrix: pd.DataFrame,
+    correlation_matrix: pd.DataFrame,
+    correlation_pairs: pd.DataFrame,
     chart_paths: dict[str, Path],
     output_path: str | Path,
     report_date: str,
@@ -175,6 +239,9 @@ def write_phase1_report(
         benchmark_comparisons=benchmark_comparisons,
         liquidity_table=liquidity_table,
         etf_summary=etf_summary,
+        covariance_matrix=covariance_matrix,
+        correlation_matrix=correlation_matrix,
+        correlation_pairs=correlation_pairs,
         chart_paths=chart_paths,
         report_date=report_date,
         notes=notes,
