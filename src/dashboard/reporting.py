@@ -122,6 +122,8 @@ def build_phase1_report_markdown(
     turnover_summary: pd.DataFrame,
     annual_return_table: pd.DataFrame,
     benchmark_comparisons: pd.DataFrame,
+    benchmark_annual_excess_returns: pd.DataFrame,
+    benchmark_drawdown_comparisons: pd.DataFrame,
     liquidity_table: pd.DataFrame,
     etf_summary: pd.DataFrame,
     covariance_matrix: pd.DataFrame,
@@ -170,6 +172,14 @@ def build_phase1_report_markdown(
             benchmark_view[column] = benchmark_view[column].map(_format_decimal)
         else:
             benchmark_view[column] = benchmark_view[column].map(_format_percent)
+
+    excess_view = benchmark_annual_excess_returns.copy()
+    for column in excess_view.columns:
+        excess_view[column] = excess_view[column].map(_format_percent)
+
+    drawdown_view = benchmark_drawdown_comparisons.copy()
+    for column in drawdown_view.columns:
+        drawdown_view[column] = drawdown_view[column].map(_format_percent)
 
     etf_view = etf_summary[
         [
@@ -230,6 +240,14 @@ Generated: {report_date}
 
 {dataframe_to_markdown_table(benchmark_view) if not benchmark_view.empty else "No benchmark comparisons generated."}
 
+## Benchmark Annual Excess Returns
+
+{dataframe_to_markdown_table(excess_view) if not excess_view.empty else "No benchmark annual excess returns generated."}
+
+## Benchmark Drawdown Comparisons
+
+{dataframe_to_markdown_table(drawdown_view) if not drawdown_view.empty else "No benchmark drawdown comparisons generated."}
+
 ## ETF Summary
 
 {dataframe_to_markdown_table(etf_view)}
@@ -255,6 +273,8 @@ def build_phase1_report_html(
     turnover_summary: pd.DataFrame,
     annual_return_table: pd.DataFrame,
     benchmark_comparisons: pd.DataFrame,
+    benchmark_annual_excess_returns: pd.DataFrame,
+    benchmark_drawdown_comparisons: pd.DataFrame,
     liquidity_table: pd.DataFrame,
     etf_summary: pd.DataFrame,
     covariance_matrix: pd.DataFrame,
@@ -303,6 +323,14 @@ def build_phase1_report_html(
             benchmark_view[column] = benchmark_view[column].map(_format_decimal)
         else:
             benchmark_view[column] = benchmark_view[column].map(_format_percent)
+
+    excess_view = benchmark_annual_excess_returns.copy()
+    for column in excess_view.columns:
+        excess_view[column] = excess_view[column].map(_format_percent)
+
+    drawdown_view = benchmark_drawdown_comparisons.copy()
+    for column in drawdown_view.columns:
+        drawdown_view[column] = drawdown_view[column].map(_format_percent)
 
     etf_view = etf_summary[
         [
@@ -374,6 +402,8 @@ def build_phase1_report_html(
   <section><h2>Turnover Summary</h2>{dataframe_to_html_table(turnover_view)}</section>
   <section><h2>Annual Return Table</h2>{dataframe_to_html_table(annual_view)}</section>
   <section><h2>Benchmark Comparisons</h2>{dataframe_to_html_table(benchmark_view) if not benchmark_view.empty else "<p>No benchmark comparisons generated.</p>"}</section>
+  <section><h2>Benchmark Annual Excess Returns</h2>{dataframe_to_html_table(excess_view) if not excess_view.empty else "<p>No benchmark annual excess returns generated.</p>"}</section>
+  <section><h2>Benchmark Drawdown Comparisons</h2>{dataframe_to_html_table(drawdown_view) if not drawdown_view.empty else "<p>No benchmark drawdown comparisons generated.</p>"}</section>
   <section><h2>ETF Summary</h2>{dataframe_to_html_table(etf_view)}</section>
   <section><h2>Correlation Highlights</h2>{dataframe_to_html_table(correlation_summary) if not correlation_summary.empty else "<p>No non-diagonal correlation pairs available.</p>"}</section>
   <section><h2>Asset Risk Snapshot</h2>{dataframe_to_html_table(asset_risk_snapshot) if not asset_risk_snapshot.empty else "<p>No asset risk snapshot available.</p>"}</section>
@@ -389,6 +419,8 @@ def write_phase1_report(
     turnover_summary: pd.DataFrame,
     annual_return_table: pd.DataFrame,
     benchmark_comparisons: pd.DataFrame,
+    benchmark_annual_excess_returns: pd.DataFrame,
+    benchmark_drawdown_comparisons: pd.DataFrame,
     liquidity_table: pd.DataFrame,
     etf_summary: pd.DataFrame,
     covariance_matrix: pd.DataFrame,
@@ -408,6 +440,8 @@ def write_phase1_report(
         turnover_summary=turnover_summary,
         annual_return_table=annual_return_table,
         benchmark_comparisons=benchmark_comparisons,
+        benchmark_annual_excess_returns=benchmark_annual_excess_returns,
+        benchmark_drawdown_comparisons=benchmark_drawdown_comparisons,
         liquidity_table=liquidity_table,
         etf_summary=etf_summary,
         covariance_matrix=covariance_matrix,
@@ -427,6 +461,8 @@ def write_phase1_html_report(
     turnover_summary: pd.DataFrame,
     annual_return_table: pd.DataFrame,
     benchmark_comparisons: pd.DataFrame,
+    benchmark_annual_excess_returns: pd.DataFrame,
+    benchmark_drawdown_comparisons: pd.DataFrame,
     liquidity_table: pd.DataFrame,
     etf_summary: pd.DataFrame,
     covariance_matrix: pd.DataFrame,
@@ -446,6 +482,8 @@ def write_phase1_html_report(
         turnover_summary=turnover_summary,
         annual_return_table=annual_return_table,
         benchmark_comparisons=benchmark_comparisons,
+        benchmark_annual_excess_returns=benchmark_annual_excess_returns,
+        benchmark_drawdown_comparisons=benchmark_drawdown_comparisons,
         liquidity_table=liquidity_table,
         etf_summary=etf_summary,
         covariance_matrix=covariance_matrix,

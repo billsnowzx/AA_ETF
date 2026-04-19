@@ -46,6 +46,15 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     )
     annual_return_table = pd.DataFrame({"portfolio": [0.10]}, index=pd.Index([2024], name="year"))
     benchmark_comparisons = pd.DataFrame({"tracking_error": [0.02]}, index=pd.Index(["benchmark_a"]))
+    benchmark_annual_excess_returns = pd.DataFrame({"benchmark_a": [0.01]}, index=pd.Index([2024], name="year"))
+    benchmark_drawdown_comparisons = pd.DataFrame(
+        {
+            "strategy_max_drawdown": [-0.2],
+            "benchmark_max_drawdown": [-0.15],
+            "max_drawdown_gap": [-0.05],
+        },
+        index=pd.Index(["benchmark_a"], name="benchmark"),
+    )
     liquidity_table = pd.DataFrame(
         {"passes_liquidity_filter": [True, False]},
         index=pd.Index(["VTI", "IAGG"], name="ticker"),
@@ -86,6 +95,8 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         turnover_summary=turnover_summary,
         annual_return_table=annual_return_table,
         benchmark_comparisons=benchmark_comparisons,
+        benchmark_annual_excess_returns=benchmark_annual_excess_returns,
+        benchmark_drawdown_comparisons=benchmark_drawdown_comparisons,
         liquidity_table=liquidity_table,
         etf_summary=etf_summary,
         covariance_matrix=covariance_matrix,
@@ -102,6 +113,8 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "balanced_nav.png" in report
     assert "## Correlation Highlights" in report
     assert "VTI vs AGG" in report
+    assert "## Benchmark Annual Excess Returns" in report
+    assert "## Benchmark Drawdown Comparisons" in report
 
 
 def test_build_phase1_report_html_contains_key_sections() -> None:
@@ -117,6 +130,15 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     )
     annual_return_table = pd.DataFrame({"portfolio": [0.10]}, index=pd.Index([2024], name="year"))
     benchmark_comparisons = pd.DataFrame({"tracking_error": [0.02]}, index=pd.Index(["benchmark_a"]))
+    benchmark_annual_excess_returns = pd.DataFrame({"benchmark_a": [0.01]}, index=pd.Index([2024], name="year"))
+    benchmark_drawdown_comparisons = pd.DataFrame(
+        {
+            "strategy_max_drawdown": [-0.2],
+            "benchmark_max_drawdown": [-0.15],
+            "max_drawdown_gap": [-0.05],
+        },
+        index=pd.Index(["benchmark_a"], name="benchmark"),
+    )
     liquidity_table = pd.DataFrame(
         {"passes_liquidity_filter": [True, False]},
         index=pd.Index(["VTI", "BNDX"], name="ticker"),
@@ -155,6 +177,8 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
         turnover_summary=turnover_summary,
         annual_return_table=annual_return_table,
         benchmark_comparisons=benchmark_comparisons,
+        benchmark_annual_excess_returns=benchmark_annual_excess_returns,
+        benchmark_drawdown_comparisons=benchmark_drawdown_comparisons,
         liquidity_table=liquidity_table,
         etf_summary=etf_summary,
         covariance_matrix=covariance_matrix,
@@ -168,6 +192,8 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "<html" in report
     assert "<h2>Correlation Highlights</h2>" in report
     assert "balanced_nav.png" in report
+    assert "<h2>Benchmark Annual Excess Returns</h2>" in report
+    assert "<h2>Benchmark Drawdown Comparisons</h2>" in report
 
 
 def test_risk_summary_helpers_build_expected_tables() -> None:
@@ -220,6 +246,15 @@ def test_write_phase1_report_creates_markdown_file() -> None:
     )
     annual_return_table = pd.DataFrame({"portfolio": [0.10]}, index=pd.Index([2024], name="year"))
     benchmark_comparisons = pd.DataFrame({"tracking_error": [0.02]}, index=pd.Index(["benchmark_a"]))
+    benchmark_annual_excess_returns = pd.DataFrame({"benchmark_a": [0.01]}, index=pd.Index([2024], name="year"))
+    benchmark_drawdown_comparisons = pd.DataFrame(
+        {
+            "strategy_max_drawdown": [-0.2],
+            "benchmark_max_drawdown": [-0.15],
+            "max_drawdown_gap": [-0.05],
+        },
+        index=pd.Index(["benchmark_a"], name="benchmark"),
+    )
     liquidity_table = pd.DataFrame(
         {"passes_liquidity_filter": [True]},
         index=pd.Index(["VTI"], name="ticker"),
@@ -259,6 +294,8 @@ def test_write_phase1_report_creates_markdown_file() -> None:
             turnover_summary=turnover_summary,
             annual_return_table=annual_return_table,
             benchmark_comparisons=benchmark_comparisons,
+            benchmark_annual_excess_returns=benchmark_annual_excess_returns,
+            benchmark_drawdown_comparisons=benchmark_drawdown_comparisons,
             liquidity_table=liquidity_table,
             etf_summary=etf_summary,
             covariance_matrix=covariance_matrix,
@@ -291,6 +328,15 @@ def test_write_phase1_html_report_creates_html_file() -> None:
     )
     annual_return_table = pd.DataFrame({"portfolio": [0.10]}, index=pd.Index([2024], name="year"))
     benchmark_comparisons = pd.DataFrame({"tracking_error": [0.02]}, index=pd.Index(["benchmark_a"]))
+    benchmark_annual_excess_returns = pd.DataFrame({"benchmark_a": [0.01]}, index=pd.Index([2024], name="year"))
+    benchmark_drawdown_comparisons = pd.DataFrame(
+        {
+            "strategy_max_drawdown": [-0.2],
+            "benchmark_max_drawdown": [-0.15],
+            "max_drawdown_gap": [-0.05],
+        },
+        index=pd.Index(["benchmark_a"], name="benchmark"),
+    )
     liquidity_table = pd.DataFrame(
         {"passes_liquidity_filter": [True]},
         index=pd.Index(["VTI"], name="ticker"),
@@ -330,6 +376,8 @@ def test_write_phase1_html_report_creates_html_file() -> None:
             turnover_summary=turnover_summary,
             annual_return_table=annual_return_table,
             benchmark_comparisons=benchmark_comparisons,
+            benchmark_annual_excess_returns=benchmark_annual_excess_returns,
+            benchmark_drawdown_comparisons=benchmark_drawdown_comparisons,
             liquidity_table=liquidity_table,
             etf_summary=etf_summary,
             covariance_matrix=covariance_matrix,
