@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Union
 
 import pandas as pd
 
+from src.analytics.drawdown import max_drawdown_from_returns
 from src.analytics.returns import annualized_return
 
 PandasLike = Union[pd.Series, pd.DataFrame]
@@ -111,3 +113,54 @@ def benchmark_comparison(
             ),
         }
     )
+
+
+def benchmark_annual_excess_return_table(
+    strategy_returns: pd.Series,
+    benchmark_returns: Mapping[str, pd.Series] | None = None,
+) -> pd.DataFrame:
+    """Build a calendar-year excess-return table versus each benchmark."""
+    if not benchmark_returns:
+        return pd.DataFrame()
+
+    strategy_annual = annual_return_table(strategy_returns)["annual_return"].rename("strategy")
+    tables: list[pd.Series] = []
+
+    for name, returns in benchmark_returns.items():
+        benchmark_annual = annual_return_table(returns)["annual_return"]
+        aligned = pd.concat([strategy_annual, benchmark_annual.rename(name)], axis=1, join="inner").dropna(how="any")
+        if aligned.empty:
+            continue
+        tables.append((aligned["strategy"] - aligned[name]).rename(name))
+
+    if not tables:
+        return pd.DataFrame()
+
+    result = pd.concat(tables, axis=1)
+    result.index.name = "year"
+    return result
+
+
+def benchmark_drawdown_comparison(
+    strategy_returns: pd.Series,
+    benchmark_returns: Mapping[str, pd.Series] | None = None,
+) -> pd.DataFrame:
+    """Compare max drawdown and drawdown gap versus each benchmark."""
+    if not benchmark_returns:
+        return pd.DataFrame()
+
+    strategy_max_drawdown = float(max_drawdown_from_returns(strategy_returns))
+    rows: list[dict[str, float | str]] = []
+
+    for name, returns in benchmark_returns.items():
+        benchmark_max_drawdown = float(max_drawdown_from_returns(returns))
+        rows.append(
+            {
+                "benchmark": name,
+                "strategy_max_drawdown": strategy_max_drawdown,
+                "benchmark_max_drawdown": benchmark_max_drawdown,
+                "max_drawdown_gap": strategy_max_drawdown - benchmark_max_drawdown,
+            }
+        )
+
+    return pd.DataFrame(rows).set_index("benchmark")

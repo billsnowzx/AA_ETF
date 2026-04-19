@@ -6,7 +6,9 @@ import pytest
 from src.analytics.attribution import (
     align_return_series,
     annual_return_table,
+    benchmark_annual_excess_return_table,
     benchmark_comparison,
+    benchmark_drawdown_comparison,
     excess_returns,
     information_ratio,
     tracking_error,
@@ -87,3 +89,33 @@ def test_benchmark_comparison_contains_expected_fields() -> None:
         "information_ratio",
     ]
     assert comparison["tracking_error"] > 0
+
+
+def test_benchmark_annual_excess_return_table_builds_calendar_gaps() -> None:
+    index = pd.to_datetime(["2023-12-29", "2024-01-02", "2024-12-31"])
+    strategy = pd.Series([0.10, 0.05, -0.02], index=index)
+    benchmark_returns = {
+        "benchmark_a": pd.Series([0.08, 0.04, -0.01], index=index),
+    }
+
+    result = benchmark_annual_excess_return_table(strategy, benchmark_returns)
+
+    assert list(result.columns) == ["benchmark_a"]
+    assert list(result.index) == [2023, 2024]
+    assert result.loc[2023, "benchmark_a"] > 0
+
+
+def test_benchmark_drawdown_comparison_contains_gap_fields() -> None:
+    strategy = pd.Series([0.05, -0.10, 0.02, -0.03], index=pd.date_range("2024-01-01", periods=4))
+    benchmark_returns = {
+        "benchmark_a": pd.Series([0.03, -0.05, 0.01, -0.01], index=strategy.index),
+    }
+
+    result = benchmark_drawdown_comparison(strategy, benchmark_returns)
+
+    assert list(result.columns) == [
+        "strategy_max_drawdown",
+        "benchmark_max_drawdown",
+        "max_drawdown_gap",
+    ]
+    assert "benchmark_a" in result.index

@@ -5,7 +5,9 @@ import pandas as pd
 from src.backtest.engine import (
     calendar_rebalance_dates,
     compile_annual_return_table,
+    compile_benchmark_annual_excess_returns,
     compile_benchmark_comparisons,
+    compile_benchmark_drawdown_comparisons,
     run_fixed_weight_backtest,
 )
 
@@ -97,9 +99,19 @@ def test_compile_annual_return_table_and_benchmark_comparisons() -> None:
         benchmark_returns=benchmark_returns,
         periods_per_year=3,
     )
+    excess_table = compile_benchmark_annual_excess_returns(
+        portfolio_returns,
+        benchmark_returns=benchmark_returns,
+    )
+    drawdown_comparisons = compile_benchmark_drawdown_comparisons(
+        portfolio_returns,
+        benchmark_returns=benchmark_returns,
+    )
 
     assert list(annual_table.columns) == ["portfolio", "benchmark_a"]
     assert "tracking_error" in comparisons.columns
+    assert "benchmark_a" in excess_table.columns
+    assert "max_drawdown_gap" in drawdown_comparisons.columns
 
 
 def test_run_fixed_weight_backtest_includes_benchmark_outputs() -> None:
@@ -118,3 +130,5 @@ def test_run_fixed_weight_backtest_includes_benchmark_outputs() -> None:
 
     assert "benchmark_a" in result["annual_return_table"].columns
     assert "benchmark_a" in result["benchmark_comparisons"].index
+    assert "benchmark_a" in result["benchmark_annual_excess_returns"].columns
+    assert "benchmark_a" in result["benchmark_drawdown_comparisons"].index

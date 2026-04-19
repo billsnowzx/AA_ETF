@@ -6,7 +6,12 @@ from collections.abc import Mapping
 
 import pandas as pd
 
-from src.analytics.attribution import annual_return_table, benchmark_comparison
+from src.analytics.attribution import (
+    annual_return_table,
+    benchmark_annual_excess_return_table,
+    benchmark_comparison,
+    benchmark_drawdown_comparison,
+)
 from src.analytics.risk import risk_summary
 from src.portfolio.saa import align_weights_to_returns
 from src.portfolio.transaction_cost import transaction_cost_drag, turnover_traded_weight
@@ -77,6 +82,28 @@ def compile_benchmark_comparisons(
         for name, returns in benchmark_returns.items()
     }
     return pd.DataFrame(comparisons).T
+
+
+def compile_benchmark_annual_excess_returns(
+    portfolio_returns: pd.Series,
+    benchmark_returns: Mapping[str, pd.Series] | None = None,
+) -> pd.DataFrame:
+    """Build a calendar-year excess-return table versus each benchmark."""
+    return benchmark_annual_excess_return_table(
+        portfolio_returns,
+        benchmark_returns=benchmark_returns,
+    )
+
+
+def compile_benchmark_drawdown_comparisons(
+    portfolio_returns: pd.Series,
+    benchmark_returns: Mapping[str, pd.Series] | None = None,
+) -> pd.DataFrame:
+    """Build a max-drawdown comparison table versus each benchmark."""
+    return benchmark_drawdown_comparison(
+        portfolio_returns,
+        benchmark_returns=benchmark_returns,
+    )
 
 
 def run_fixed_weight_backtest(
@@ -176,6 +203,14 @@ def run_fixed_weight_backtest(
             portfolio_returns,
             benchmark_returns=benchmark_returns,
             periods_per_year=periods_per_year,
+        ),
+        "benchmark_annual_excess_returns": compile_benchmark_annual_excess_returns(
+            portfolio_returns,
+            benchmark_returns=benchmark_returns,
+        ),
+        "benchmark_drawdown_comparisons": compile_benchmark_drawdown_comparisons(
+            portfolio_returns,
+            benchmark_returns=benchmark_returns,
         ),
     }
     return results

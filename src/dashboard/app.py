@@ -1,0 +1,265 @@
+"""Minimal local dashboard app for browsing generated research outputs."""
+
+from __future__ import annotations
+
+import argparse
+from html import escape
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from socketserver import TCPServer
+
+import pandas as pd
+
+
+def _read_csv_if_exists(path: Path, index_col: int | str | None = 0) -> pd.DataFrame:
+    """Read a CSV when it exists, otherwise return an empty frame."""
+    if not path.exists():
+        return pd.DataFrame()
+    return pd.read_csv(path, index_col=index_col)
+
+
+def dataframe_to_html_table(frame: pd.DataFrame) -> str:
+    """Render a DataFrame to a simple HTML table."""
+    if frame.empty:
+        return "<p>No data available.</p>"
+
+    table = frame.copy()
+    header_cells = "".join(f"<th>{escape(str(column))}</th>" for column in ["index", *table.columns.tolist()])
+    body_rows: list[str] = []
+
+    for index, row in table.iterrows():
+        values = [index, *row.tolist()]
+        body_rows.append(
+            "<tr>" + "".join(f"<td>{escape(str(value))}</td>" for value in values) + "</tr>"
+        )
+
+    return "<table><thead><tr>" + header_cells + "</tr></thead><tbody>" + "".join(body_rows) + "</tbody></table>"
+
+
+def build_dashboard_html(
+    output_dir: str | Path = "outputs/tables",
+    figure_dir: str | Path = "outputs/figures",
+    report_dir: str | Path = "outputs/reports",
+) -> str:
+    """Build a self-contained dashboard page from generated outputs."""
+    output_path = Path(output_dir)
+    figure_path = Path(figure_dir)
+    report_path = Path(report_dir)
+
+    performance_summary = _read_csv_if_exists(output_path / "performance_summary.csv")
+    benchmark_comparisons = _read_csv_if_exists(output_path / "benchmark_comparisons.csv")
+    annual_excess = _read_csv_if_exists(output_path / "benchmark_annual_excess_returns.csv")
+    drawdown_comparisons = _read_csv_if_exists(output_path / "benchmark_drawdown_comparisons.csv")
+    top_correlations = _read_csv_if_exists(output_path / "top_correlation_pairs.csv", index_col=None)
+    asset_risk_snapshot = _read_csv_if_exists(output_path / "asset_risk_snapshot.csv")
+    etf_summary = _read_csv_if_exists(output_path / "etf_summary.csv")
+
+    report_links = []
+    for report_name in ["balanced_phase1_report.html", "balanced_phase1_report.md"]:
+        report_file = report_path / report_name
+        if report_file.exists():
+            report_links.append(
+                f'<li><a href="../reports/{escape(report_name)}" target="_blank">{escape(report_name)}</a></li>'
+            )
+    report_links_html = "".join(report_links) if report_links else "<li>No reports available.</li>"
+
+    figure_cards = []
+    for title, filename in [
+        ("NAV", "balanced_nav.png"),
+        ("Drawdown", "balanced_drawdown.png"),
+        ("Annual Returns", "balanced_annual_returns.png"),
+        ("Correlation Heatmap", "correlation_heatmap.png"),
+    ]:
+        figure_file = figure_path / filename
+        if figure_file.exists():
+            figure_cards.append(
+                f"""
+                <section class="card chart">
+                  <h3>{escape(title)}</h3>
+                  <img src="../figures/{escape(filename)}" alt="{escape(title)}" />
+                </section>
+                """
+            )
+    figure_cards_html = "".join(figure_cards) if figure_cards else "<p>No figures available.</p>"
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>AA ETF Dashboard</title>
+  <style>
+    :root {{
+      --paper: #f4efe5;
+      --ink: #1f2933;
+      --muted: #52606d;
+      --panel: #fffdf8;
+      --line: #d9d0bb;
+      --accent: #7c3f00;
+    }}
+    body {{
+      margin: 0;
+      font-family: Georgia, 'Times New Roman', serif;
+      background: radial-gradient(circle at top left, #fff8ec, var(--paper));
+      color: var(--ink);
+    }}
+    .shell {{
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }}
+    .hero {{
+      padding: 24px 28px;
+      background: linear-gradient(135deg, #fffaf0, #efe4d1);
+      border: 1px solid var(--line);
+      margin-bottom: 20px;
+    }}
+    h1, h2, h3 {{
+      color: #102a43;
+      margin-top: 0;
+    }}
+    p, li {{
+      color: var(--muted);
+    }}
+    .grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }}
+    .card {{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 16px;
+      overflow-x: auto;
+    }}
+    table {{
+      border-collapse: collapse;
+      width: 100%;
+      background: white;
+    }}
+    th, td {{
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
+      white-space: nowrap;
+    }}
+    th {{
+      background: #efe7d3;
+    }}
+    .chart img {{
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--line);
+      background: white;
+    }}
+    a {{
+      color: var(--accent);
+    }}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <h1>AA ETF Research Dashboard</h1>
+      <p>Local dashboard for browsing the latest pipeline outputs, benchmark-relative tables, figures, and reports.</p>
+      <ul>{report_links_html}</ul>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Performance Summary</h2>
+        {dataframe_to_html_table(performance_summary)}
+      </section>
+      <section class="card">
+        <h2>Benchmark Comparisons</h2>
+        {dataframe_to_html_table(benchmark_comparisons)}
+      </section>
+      <section class="card">
+        <h2>Benchmark Annual Excess Returns</h2>
+        {dataframe_to_html_table(annual_excess)}
+      </section>
+      <section class="card">
+        <h2>Benchmark Drawdown Comparisons</h2>
+        {dataframe_to_html_table(drawdown_comparisons)}
+      </section>
+      <section class="card">
+        <h2>Top Correlation Pairs</h2>
+        {dataframe_to_html_table(top_correlations)}
+      </section>
+      <section class="card">
+        <h2>Asset Risk Snapshot</h2>
+        {dataframe_to_html_table(asset_risk_snapshot)}
+      </section>
+      <section class="card">
+        <h2>ETF Summary</h2>
+        {dataframe_to_html_table(etf_summary)}
+      </section>
+    </div>
+
+    <div class="grid">
+      {figure_cards_html}
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+def write_dashboard_html(
+    output_path: str | Path = "outputs/reports/dashboard.html",
+    output_dir: str | Path = "outputs/tables",
+    figure_dir: str | Path = "outputs/figures",
+    report_dir: str | Path = "outputs/reports",
+) -> Path:
+    """Write the dashboard page to disk."""
+    destination = Path(output_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    html = build_dashboard_html(output_dir=output_dir, figure_dir=figure_dir, report_dir=report_dir)
+    destination.write_text(html, encoding="utf-8")
+    return destination
+
+
+def run_dashboard_server(
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    directory: str | Path = "outputs",
+) -> None:
+    """Serve the output directory locally for dashboard browsing."""
+    class Handler(SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(directory), **kwargs)
+
+    TCPServer.allow_reuse_address = True
+    with ThreadingHTTPServer((host, port), Handler) as httpd:
+        print(f"Serving dashboard at http://{host}:{port}/reports/dashboard.html")
+        httpd.serve_forever()
+
+
+def build_argument_parser() -> argparse.ArgumentParser:
+    """Build the CLI for the local dashboard app."""
+    parser = argparse.ArgumentParser(description="Run the local AA ETF dashboard.")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--output-dir", default="outputs/tables")
+    parser.add_argument("--figure-dir", default="outputs/figures")
+    parser.add_argument("--report-dir", default="outputs/reports")
+    parser.add_argument("--dashboard-path", default="outputs/reports/dashboard.html")
+    return parser
+
+
+def main() -> None:
+    """Generate and serve the local dashboard."""
+    parser = build_argument_parser()
+    args = parser.parse_args()
+
+    write_dashboard_html(
+        output_path=args.dashboard_path,
+        output_dir=args.output_dir,
+        figure_dir=args.figure_dir,
+        report_dir=args.report_dir,
+    )
+    run_dashboard_server(host=args.host, port=args.port, directory=Path(args.dashboard_path).parent.parent)
+
+
+if __name__ == "__main__":
+    main()

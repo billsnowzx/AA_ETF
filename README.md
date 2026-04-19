@@ -101,11 +101,24 @@ This command will:
 - generate `outputs/tables/investable_universe.csv`
 - run the default strategic portfolio plus configured benchmarks
 - generate `performance_summary.csv`, `annual_return_table.csv`, `turnover_summary.csv`, `benchmark_comparisons.csv`, `nav_series.csv`, and `return_series.csv`
+- generate `benchmark_annual_excess_returns.csv` and `benchmark_drawdown_comparisons.csv`
 - generate `covariance_matrix.csv`, `correlation_matrix.csv`, `covariance_pairs.csv`, and `correlation_pairs.csv`
 - generate `top_correlation_pairs.csv` and `asset_risk_snapshot.csv`
 - generate `backtest_universe_validation.csv` and `backtest_universe_policy_summary.csv`
 - generate the required Phase 1 charts under `outputs/figures/`
 - generate Markdown and HTML reports under `outputs/reports/`
+
+## Running the local dashboard
+
+```bash
+python -m src.dashboard.app
+```
+
+This command will:
+
+- generate `outputs/reports/dashboard.html`
+- start a local server at `http://127.0.0.1:8000/reports/dashboard.html`
+- serve the latest pipeline tables, figures, and generated reports through a single local page
 
 Optional policy:
 

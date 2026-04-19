@@ -159,6 +159,8 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert "asset_risk_snapshot" in risk_outputs
         assert (output_dir / "performance_summary.csv").exists()
         assert (output_dir / "annual_return_table.csv").exists()
+        assert (output_dir / "benchmark_annual_excess_returns.csv").exists()
+        assert (output_dir / "benchmark_drawdown_comparisons.csv").exists()
         assert (output_dir / "nav_series.csv").exists()
         assert (output_dir / "backtest_universe_validation.csv").exists()
         assert (output_dir / "covariance_matrix.csv").exists()

@@ -300,6 +300,8 @@ def write_backtest_outputs(
     turnover_summary = build_turnover_summary(strategy_name, strategy_result, benchmark_results)
     annual_return_table = strategy_result["annual_return_table"]
     benchmark_comparisons = strategy_result["benchmark_comparisons"]
+    benchmark_annual_excess_returns = strategy_result["benchmark_annual_excess_returns"]
+    benchmark_drawdown_comparisons = strategy_result["benchmark_drawdown_comparisons"]
     nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
@@ -308,6 +310,8 @@ def write_backtest_outputs(
     turnover_summary.to_csv(output_path / "turnover_summary.csv", index=True)
     annual_return_table.to_csv(output_path / "annual_return_table.csv", index=True)
     benchmark_comparisons.to_csv(output_path / "benchmark_comparisons.csv", index=True)
+    benchmark_annual_excess_returns.to_csv(output_path / "benchmark_annual_excess_returns.csv", index=True)
+    benchmark_drawdown_comparisons.to_csv(output_path / "benchmark_drawdown_comparisons.csv", index=True)
     nav_table.to_csv(output_path / "nav_series.csv", index=True)
     return_table.to_csv(output_path / "return_series.csv", index=True)
     policy_validation.to_csv(output_path / "backtest_universe_validation.csv", index=True)
@@ -323,6 +327,8 @@ def write_backtest_outputs(
     LOGGER.info("Saved turnover summary to %s", output_path / "turnover_summary.csv")
     LOGGER.info("Saved annual return table to %s", output_path / "annual_return_table.csv")
     LOGGER.info("Saved benchmark comparisons to %s", output_path / "benchmark_comparisons.csv")
+    LOGGER.info("Saved benchmark annual excess returns to %s", output_path / "benchmark_annual_excess_returns.csv")
+    LOGGER.info("Saved benchmark drawdown comparisons to %s", output_path / "benchmark_drawdown_comparisons.csv")
     LOGGER.info("Saved covariance matrix to %s", output_path / "covariance_matrix.csv")
     LOGGER.info("Saved correlation matrix to %s", output_path / "correlation_matrix.csv")
     LOGGER.info("Saved top correlation pairs to %s", output_path / "top_correlation_pairs.csv")
