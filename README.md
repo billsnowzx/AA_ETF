@@ -92,6 +92,12 @@ python -m pytest
 python run_pipeline.py --start 2020-01-01 --end 2024-12-31
 ```
 
+The rolling volatility and rolling Sharpe outputs use a 63-trading-day window by default. Override it with `--rolling-window`, for example:
+
+```bash
+python run_pipeline.py --start 2020-01-01 --end 2024-12-31 --rolling-window 21
+```
+
 This command will:
 
 - download per-ticker raw prices into `data/raw/`

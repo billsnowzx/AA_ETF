@@ -4,7 +4,17 @@ from pathlib import Path
 
 import pandas as pd
 
-from run_pipeline import save_processed_frames, write_liquidity_outputs
+from run_pipeline import build_argument_parser, save_processed_frames, write_liquidity_outputs
+
+
+def test_argument_parser_exposes_rolling_window_default_and_override() -> None:
+    parser = build_argument_parser()
+
+    default_args = parser.parse_args(["--start", "2024-01-01"])
+    override_args = parser.parse_args(["--start", "2024-01-01", "--rolling-window", "21"])
+
+    assert default_args.rolling_window == 63
+    assert override_args.rolling_window == 21
 
 
 def test_save_processed_frames_writes_per_ticker_csv() -> None:

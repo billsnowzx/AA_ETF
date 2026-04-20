@@ -418,6 +418,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--figure-dir", default="outputs/figures")
     parser.add_argument("--report-dir", default="outputs/reports")
     parser.add_argument(
+        "--rolling-window",
+        type=int,
+        default=63,
+        help="Trading-day window used for rolling volatility and rolling Sharpe outputs.",
+    )
+    parser.add_argument(
         "--backtest-universe-mode",
         default="configured",
         choices=["configured", "liquidity_filtered"],
@@ -489,7 +495,7 @@ def main() -> None:
         args.output_dir,
     )
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
-    rolling_outputs = build_rolling_metric_outputs(return_table)
+    rolling_outputs = build_rolling_metric_outputs(return_table, window=args.rolling_window)
     write_rolling_metric_outputs(rolling_outputs, args.output_dir)
     chart_paths = write_phase1_chart_outputs(
         strategy_name,
