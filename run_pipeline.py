@@ -417,6 +417,17 @@ def write_rolling_metric_outputs(
     LOGGER.info("Saved drawdown series to %s", output_path / "drawdown_series.csv")
 
 
+def collect_table_output_paths(output_dir: str | Path) -> dict[str, Path]:
+    """Collect generated table output files for the pipeline manifest."""
+    output_path = Path(output_dir)
+    if not output_path.exists():
+        return {}
+    return {
+        path.stem: path
+        for path in sorted(output_path.glob("*.csv"))
+    }
+
+
 def build_pipeline_manifest(
     *,
     start: str,
@@ -428,6 +439,7 @@ def build_pipeline_manifest(
     backtest_universe_mode: str,
     rolling_window: int,
     performance_summary: pd.DataFrame,
+    table_paths: dict[str, Path] | None,
     report_paths: list[Path],
     chart_paths: dict[str, Path],
     output_dir: str | Path,
@@ -470,6 +482,7 @@ def build_pipeline_manifest(
             "reports": str(Path(report_dir)),
         },
         "outputs": {
+            "tables": {name: str(path) for name, path in (table_paths or {}).items()},
             "reports": [str(path) for path in report_paths],
             "figures": {name: str(path) for name, path in chart_paths.items()},
         },
@@ -660,6 +673,7 @@ def main() -> None:
         backtest_universe_mode=args.backtest_universe_mode,
         rolling_window=args.rolling_window,
         performance_summary=performance_summary,
+        table_paths=collect_table_output_paths(args.output_dir),
         report_paths=[report_path, html_report_path],
         chart_paths=chart_paths,
         output_dir=args.output_dir,

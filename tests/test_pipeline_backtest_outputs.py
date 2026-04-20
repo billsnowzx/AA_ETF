@@ -16,6 +16,7 @@ from run_pipeline import (
     build_rolling_metric_outputs,
     build_return_table,
     build_turnover_summary,
+    collect_table_output_paths,
     collect_required_backtest_tickers,
     resolve_backtest_tickers,
     run_strategy_backtests,
@@ -203,6 +204,7 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         backtest_universe_mode="liquidity_filtered",
         rolling_window=21,
         performance_summary=performance_summary,
+        table_paths={"performance_summary": Path("outputs/tables/performance_summary.csv")},
         report_paths=[Path("outputs/reports/balanced_phase1_report.md")],
         chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
         output_dir="outputs/tables",
@@ -222,6 +224,21 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         assert loaded["parameters"]["backtest_universe_mode"] == "liquidity_filtered"
         assert loaded["universes"]["backtest_tickers"] == ["VTI", "AGG"]
         assert loaded["strategy"]["ending_nav"] == 1.25
+        assert loaded["outputs"]["tables"]["performance_summary"] == "outputs\\tables\\performance_summary.csv"
         assert loaded["outputs"]["figures"]["nav_chart"] == "outputs\\figures\\balanced_nav.png"
+    finally:
+        shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_collect_table_output_paths_returns_csv_outputs_by_stem() -> None:
+    output_dir = Path("data/cache") / f"test_table_paths_{uuid.uuid4().hex}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        (output_dir / "performance_summary.csv").write_text("x\n1\n", encoding="utf-8")
+        (output_dir / "pipeline_manifest.json").write_text("{}", encoding="utf-8")
+
+        paths = collect_table_output_paths(output_dir)
+
+        assert paths == {"performance_summary": output_dir / "performance_summary.csv"}
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
