@@ -2,6 +2,7 @@ import shutil
 import uuid
 from pathlib import Path
 
+import json
 import math
 import pandas as pd
 
@@ -10,6 +11,7 @@ from run_pipeline import (
     build_nav_table,
     build_backtest_policy_tables,
     build_performance_summary,
+    build_pipeline_manifest,
     build_risk_matrix_outputs,
     build_rolling_metric_outputs,
     build_return_table,
@@ -18,6 +20,7 @@ from run_pipeline import (
     resolve_backtest_tickers,
     run_strategy_backtests,
     write_backtest_outputs,
+    write_pipeline_manifest,
     write_rolling_metric_outputs,
 )
 
@@ -176,5 +179,49 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert (output_dir / "rolling_volatility.csv").exists()
         assert (output_dir / "rolling_sharpe.csv").exists()
         assert (output_dir / "drawdown_series.csv").exists()
+    finally:
+        shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_build_and_write_pipeline_manifest_records_run_context() -> None:
+    performance_summary = pd.DataFrame(
+        {
+            "ending_nav": [1.25],
+            "annualized_return": [0.10],
+            "annualized_volatility": [0.12],
+            "max_drawdown": [-0.20],
+        },
+        index=pd.Index(["balanced"], name="portfolio"),
+    )
+    manifest = build_pipeline_manifest(
+        start="2024-01-01",
+        end="2024-12-31",
+        enabled_tickers=["VTI", "AGG"],
+        liquid_tickers=["VTI", "AGG"],
+        backtest_tickers=["VTI", "AGG"],
+        strategy_name="balanced",
+        backtest_universe_mode="liquidity_filtered",
+        rolling_window=21,
+        performance_summary=performance_summary,
+        report_paths=[Path("outputs/reports/balanced_phase1_report.md")],
+        chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
+        output_dir="outputs/tables",
+        raw_dir="data/raw",
+        processed_dir="data/processed",
+        figure_dir="outputs/figures",
+        report_dir="outputs/reports",
+        run_completed_at="2026-04-20T00:00:00+00:00",
+    )
+
+    output_dir = Path("data/cache") / f"test_manifest_{uuid.uuid4().hex}"
+    try:
+        manifest_path = write_pipeline_manifest(manifest, output_dir)
+        loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        assert loaded["parameters"]["rolling_window"] == 21
+        assert loaded["parameters"]["backtest_universe_mode"] == "liquidity_filtered"
+        assert loaded["universes"]["backtest_tickers"] == ["VTI", "AGG"]
+        assert loaded["strategy"]["ending_nav"] == 1.25
+        assert loaded["outputs"]["figures"]["nav_chart"] == "outputs\\figures\\balanced_nav.png"
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)

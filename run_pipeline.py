@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 from pathlib import Path
 
@@ -402,6 +403,75 @@ def write_rolling_metric_outputs(
     LOGGER.info("Saved drawdown series to %s", output_path / "drawdown_series.csv")
 
 
+def build_pipeline_manifest(
+    *,
+    start: str,
+    end: str | None,
+    enabled_tickers: list[str],
+    liquid_tickers: list[str],
+    backtest_tickers: list[str],
+    strategy_name: str,
+    backtest_universe_mode: str,
+    rolling_window: int,
+    performance_summary: pd.DataFrame,
+    report_paths: list[Path],
+    chart_paths: dict[str, Path],
+    output_dir: str | Path,
+    raw_dir: str | Path,
+    processed_dir: str | Path,
+    figure_dir: str | Path,
+    report_dir: str | Path,
+    run_completed_at: str | None = None,
+) -> dict:
+    """Build a reproducibility manifest for a completed Phase 1 pipeline run."""
+    completed_at = run_completed_at or pd.Timestamp.utcnow().isoformat()
+    strategy_row = performance_summary.loc[strategy_name]
+    return {
+        "run_completed_at": completed_at,
+        "date_range": {
+            "start": start,
+            "end": end,
+        },
+        "parameters": {
+            "backtest_universe_mode": backtest_universe_mode,
+            "rolling_window": rolling_window,
+        },
+        "universes": {
+            "enabled_tickers": enabled_tickers,
+            "liquid_tickers": liquid_tickers,
+            "backtest_tickers": backtest_tickers,
+        },
+        "strategy": {
+            "name": strategy_name,
+            "ending_nav": float(strategy_row["ending_nav"]),
+            "annualized_return": float(strategy_row["annualized_return"]),
+            "annualized_volatility": float(strategy_row["annualized_volatility"]),
+            "max_drawdown": float(strategy_row["max_drawdown"]),
+        },
+        "directories": {
+            "raw": str(Path(raw_dir)),
+            "processed": str(Path(processed_dir)),
+            "tables": str(Path(output_dir)),
+            "figures": str(Path(figure_dir)),
+            "reports": str(Path(report_dir)),
+        },
+        "outputs": {
+            "reports": [str(path) for path in report_paths],
+            "figures": {name: str(path) for name, path in chart_paths.items()},
+        },
+    }
+
+
+def write_pipeline_manifest(manifest: dict, output_dir: str | Path) -> Path:
+    """Persist the pipeline manifest as auditable JSON."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    manifest_path = output_path / "pipeline_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    LOGGER.info("Saved pipeline manifest to %s", manifest_path)
+    return manifest_path
+
+
 def build_argument_parser() -> argparse.ArgumentParser:
     """Build the CLI for the Phase 1 pipeline runner."""
     parser = argparse.ArgumentParser(description="Run the Phase 1 ETF data pipeline.")
@@ -562,6 +632,26 @@ def main() -> None:
     )
     LOGGER.info("Saved Phase 1 report to %s", report_path)
     LOGGER.info("Saved Phase 1 HTML report to %s", html_report_path)
+
+    manifest = build_pipeline_manifest(
+        start=args.start,
+        end=args.end,
+        enabled_tickers=tickers,
+        liquid_tickers=liquid_tickers,
+        backtest_tickers=backtest_tickers,
+        strategy_name=strategy_name,
+        backtest_universe_mode=args.backtest_universe_mode,
+        rolling_window=args.rolling_window,
+        performance_summary=performance_summary,
+        report_paths=[report_path, html_report_path],
+        chart_paths=chart_paths,
+        output_dir=args.output_dir,
+        raw_dir=args.raw_dir,
+        processed_dir=args.processed_dir,
+        figure_dir=args.figure_dir,
+        report_dir=args.report_dir,
+    )
+    write_pipeline_manifest(manifest, args.output_dir)
 
     LOGGER.info("Selected %s liquid tickers: %s", len(liquid_tickers), liquid_tickers)
 
