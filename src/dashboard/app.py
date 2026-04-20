@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from html import escape
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -16,6 +17,36 @@ def _read_csv_if_exists(path: Path, index_col: int | str | None = 0) -> pd.DataF
     if not path.exists():
         return pd.DataFrame()
     return pd.read_csv(path, index_col=index_col)
+
+
+def _read_json_if_exists(path: Path) -> dict:
+    """Read a JSON file when it exists, otherwise return an empty dict."""
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _build_manifest_summary(manifest: dict) -> pd.DataFrame:
+    """Build a compact dashboard table from the pipeline manifest."""
+    if not manifest:
+        return pd.DataFrame()
+
+    date_range = manifest.get("date_range", {})
+    parameters = manifest.get("parameters", {})
+    universes = manifest.get("universes", {})
+    strategy = manifest.get("strategy", {})
+    rows = {
+        "run_completed_at": manifest.get("run_completed_at", "n/a"),
+        "date_range": f"{date_range.get('start', 'n/a')} to {date_range.get('end', 'n/a')}",
+        "backtest_universe_mode": parameters.get("backtest_universe_mode", "n/a"),
+        "rolling_window": parameters.get("rolling_window", "n/a"),
+        "strategy": strategy.get("name", "n/a"),
+        "ending_nav": strategy.get("ending_nav", "n/a"),
+        "enabled_tickers": ", ".join(universes.get("enabled_tickers", [])),
+        "liquid_tickers": ", ".join(universes.get("liquid_tickers", [])),
+        "backtest_tickers": ", ".join(universes.get("backtest_tickers", [])),
+    }
+    return pd.DataFrame.from_dict(rows, orient="index", columns=["value"])
 
 
 def _format_percent(value: object) -> str:
@@ -114,6 +145,12 @@ def _format_dashboard_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.Da
         for column in frame.columns:
             frame[column] = frame[column].map(_format_decimal)
 
+    if "manifest_summary" in formatted:
+        frame = formatted["manifest_summary"].astype(object)
+        if "value" in frame.columns and "ending_nav" in frame.index:
+            frame.loc["ending_nav", "value"] = _format_decimal(frame.loc["ending_nav", "value"])
+        formatted["manifest_summary"] = frame
+
     return formatted
 
 
@@ -154,6 +191,7 @@ def build_dashboard_html(
     etf_summary = _read_csv_if_exists(output_path / "etf_summary.csv")
     rolling_volatility = _read_csv_if_exists(output_path / "rolling_volatility.csv")
     rolling_sharpe = _read_csv_if_exists(output_path / "rolling_sharpe.csv")
+    manifest_summary = _build_manifest_summary(_read_json_if_exists(output_path / "pipeline_manifest.json"))
     formatted_tables = _format_dashboard_tables(
         {
             "performance_summary": performance_summary,
@@ -165,6 +203,7 @@ def build_dashboard_html(
             "etf_summary": etf_summary,
             "rolling_volatility": rolling_volatility.tail(5),
             "rolling_sharpe": rolling_sharpe.tail(5),
+            "manifest_summary": manifest_summary,
         }
     )
     performance_summary = formatted_tables["performance_summary"]
@@ -176,6 +215,7 @@ def build_dashboard_html(
     etf_summary = formatted_tables["etf_summary"]
     rolling_volatility = formatted_tables["rolling_volatility"]
     rolling_sharpe = formatted_tables["rolling_sharpe"]
+    manifest_summary = formatted_tables["manifest_summary"]
 
     report_links = []
     for report_name in ["balanced_phase1_report.html", "balanced_phase1_report.md"]:
@@ -291,6 +331,10 @@ def build_dashboard_html(
     </section>
 
     <div class="grid">
+      <section class="card">
+        <h2>Run Manifest</h2>
+        {dataframe_to_html_table(manifest_summary)}
+      </section>
       <section class="card">
         <h2>Performance Summary</h2>
         {dataframe_to_html_table(performance_summary)}

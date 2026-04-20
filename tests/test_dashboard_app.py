@@ -2,9 +2,15 @@ import shutil
 import uuid
 from pathlib import Path
 
+import json
 import pandas as pd
 
-from src.dashboard.app import _format_dashboard_tables, build_dashboard_html, write_dashboard_html
+from src.dashboard.app import (
+    _build_manifest_summary,
+    _format_dashboard_tables,
+    build_dashboard_html,
+    write_dashboard_html,
+)
 
 
 def test_build_dashboard_html_contains_tables_and_figures() -> None:
@@ -43,6 +49,22 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
             table_dir / "rolling_sharpe.csv"
         )
         pd.DataFrame({"asset_class": ["us_equity"]}, index=pd.Index(["VTI"])).to_csv(table_dir / "etf_summary.csv")
+        (table_dir / "pipeline_manifest.json").write_text(
+            json.dumps(
+                {
+                    "run_completed_at": "2026-04-20T00:00:00+00:00",
+                    "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+                    "parameters": {"backtest_universe_mode": "liquidity_filtered", "rolling_window": 63},
+                    "strategy": {"name": "balanced", "ending_nav": 1.25},
+                    "universes": {
+                        "enabled_tickers": ["VTI", "AGG"],
+                        "liquid_tickers": ["AGG", "VTI"],
+                        "backtest_tickers": ["VTI", "AGG"],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
         (figure_dir / "balanced_nav.png").write_bytes(b"fake")
         (report_dir / "balanced_phase1_report.html").write_text("<html></html>", encoding="utf-8")
 
@@ -55,6 +77,8 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "balanced_phase1_report.html" in html
         assert "10.00%" in html
         assert "Latest Rolling Volatility" in html
+        assert "Run Manifest" in html
+        assert "liquidity_filtered" in html
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
 
@@ -79,6 +103,7 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
             "asset_risk_snapshot": pd.DataFrame({"avg_correlation": [0.4389], "variance": [0.000129]}),
             "rolling_volatility": pd.DataFrame({"balanced": [0.10]}),
             "rolling_sharpe": pd.DataFrame({"balanced": [0.5]}),
+            "manifest_summary": pd.DataFrame({"value": [1.25]}, index=pd.Index(["ending_nav"])),
             "etf_summary": pd.DataFrame(
                 {
                     "average_dollar_volume": [1_000_000.0],
@@ -99,7 +124,28 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["asset_risk_snapshot"].iloc[0]["variance"] == "0.000129"
     assert tables["rolling_volatility"].iloc[0]["balanced"] == "10.00%"
     assert tables["rolling_sharpe"].iloc[0]["balanced"] == "0.5000"
+    assert tables["manifest_summary"].loc["ending_nav", "value"] == "1.2500"
     assert tables["etf_summary"].loc["VTI", "average_dollar_volume"] == "1000000"
+
+
+def test_build_manifest_summary_flattens_key_run_context() -> None:
+    manifest = {
+        "run_completed_at": "2026-04-20T00:00:00+00:00",
+        "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
+        "parameters": {"backtest_universe_mode": "liquidity_filtered", "rolling_window": 63},
+        "strategy": {"name": "balanced", "ending_nav": 1.25},
+        "universes": {
+            "enabled_tickers": ["VTI", "AGG"],
+            "liquid_tickers": ["AGG", "VTI"],
+            "backtest_tickers": ["VTI", "AGG"],
+        },
+    }
+
+    summary = _build_manifest_summary(manifest)
+
+    assert summary.loc["date_range", "value"] == "2024-01-01 to 2024-12-31"
+    assert summary.loc["backtest_universe_mode", "value"] == "liquidity_filtered"
+    assert summary.loc["backtest_tickers", "value"] == "VTI, AGG"
 
 
 def test_write_dashboard_html_creates_file() -> None:

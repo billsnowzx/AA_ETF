@@ -126,7 +126,7 @@ This command will:
 
 - generate `outputs/reports/dashboard.html`
 - start a local server at `http://127.0.0.1:8000/reports/dashboard.html`
-- serve the latest pipeline tables, figures, and generated reports through a single local page
+- serve the latest pipeline tables, figures, generated reports, and run manifest through a single local page
 
 Optional policy:
 
