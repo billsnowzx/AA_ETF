@@ -6,6 +6,7 @@ import pandas as pd
 
 from src.dashboard.reporting import (
     build_asset_risk_snapshot,
+    build_latest_rolling_metric_snapshot,
     build_phase1_report_html,
     build_phase1_report_markdown,
     build_phase1_risk_summary_tables,
@@ -88,6 +89,10 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         ]
     )
     chart_paths = {"nav_chart": Path("outputs/figures/balanced_nav.png")}
+    rolling_metric_snapshot = pd.DataFrame(
+        {"balanced": [0.12, 0.8], "benchmark_a": [0.10, 0.7]},
+        index=["latest_rolling_volatility", "latest_rolling_sharpe"],
+    )
 
     report = build_phase1_report_markdown(
         strategy_name="balanced",
@@ -104,6 +109,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         correlation_pairs=correlation_pairs,
         chart_paths=chart_paths,
         report_date="2026-04-18",
+        rolling_metric_snapshot=rolling_metric_snapshot,
         notes=["IAGG failed the liquidity filter"],
     )
 
@@ -115,6 +121,8 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "VTI vs AGG" in report
     assert "## Benchmark Annual Excess Returns" in report
     assert "## Benchmark Drawdown Comparisons" in report
+    assert "## Latest Rolling Metrics" in report
+    assert "12.00%" in report
 
 
 def test_build_phase1_report_html_contains_key_sections() -> None:
@@ -186,6 +194,10 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
         correlation_pairs=correlation_pairs,
         chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
         report_date="2026-04-19",
+        rolling_metric_snapshot=pd.DataFrame(
+            {"balanced": [0.12, 0.8]},
+            index=["latest_rolling_volatility", "latest_rolling_sharpe"],
+        ),
         notes=["Backtest universe mode: liquidity_filtered"],
     )
 
@@ -194,6 +206,8 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "balanced_nav.png" in report
     assert "<h2>Benchmark Annual Excess Returns</h2>" in report
     assert "<h2>Benchmark Drawdown Comparisons</h2>" in report
+    assert "<h2>Latest Rolling Metrics</h2>" in report
+    assert "12.00%" in report
 
 
 def test_risk_summary_helpers_build_expected_tables() -> None:
@@ -228,6 +242,23 @@ def test_risk_summary_helpers_build_expected_tables() -> None:
     )
     assert "top_correlation_pairs" in tables
     assert "asset_risk_snapshot" in tables
+
+
+def test_build_latest_rolling_metric_snapshot_uses_latest_non_empty_rows() -> None:
+    index = pd.date_range("2024-01-01", periods=4)
+    rolling_volatility = pd.DataFrame(
+        {"balanced": [None, 0.10, 0.11, 0.12]},
+        index=index,
+    )
+    rolling_sharpe = pd.DataFrame(
+        {"balanced": [None, None, 0.7, 0.8]},
+        index=index,
+    )
+
+    snapshot = build_latest_rolling_metric_snapshot(rolling_volatility, rolling_sharpe)
+
+    assert snapshot.loc["latest_rolling_volatility", "balanced"] == 0.12
+    assert snapshot.loc["latest_rolling_sharpe", "balanced"] == 0.8
 
 
 def test_write_phase1_report_creates_markdown_file() -> None:

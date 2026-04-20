@@ -22,6 +22,7 @@ from src.data.clean_data import batch_clean_price_frames
 from src.data.fetch_prices import fetch_prices
 from src.dashboard.plots import write_phase1_chart_outputs
 from src.dashboard.reporting import (
+    build_latest_rolling_metric_snapshot,
     build_phase1_risk_summary_tables,
     write_phase1_html_report,
     write_phase1_report,
@@ -504,6 +505,10 @@ def main() -> None:
     performance_summary = build_performance_summary(strategy_name, strategy_result, benchmark_results)
     turnover_summary = build_turnover_summary(strategy_name, strategy_result, benchmark_results)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
+    rolling_metric_snapshot = build_latest_rolling_metric_snapshot(
+        rolling_outputs["rolling_volatility"],
+        rolling_outputs["rolling_sharpe"],
+    )
     report_notes = []
     if non_liquid_required_assets:
         report_notes.append(
@@ -527,6 +532,7 @@ def main() -> None:
         chart_paths=chart_paths,
         output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.md",
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
+        rolling_metric_snapshot=rolling_metric_snapshot,
         notes=report_notes,
     )
     html_report_path = write_phase1_html_report(
@@ -545,6 +551,7 @@ def main() -> None:
         chart_paths=chart_paths,
         output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.html",
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
+        rolling_metric_snapshot=rolling_metric_snapshot,
         notes=report_notes,
     )
     LOGGER.info("Saved Phase 1 report to %s", report_path)
