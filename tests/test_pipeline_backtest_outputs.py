@@ -11,12 +11,14 @@ from run_pipeline import (
     build_backtest_policy_tables,
     build_performance_summary,
     build_risk_matrix_outputs,
+    build_rolling_metric_outputs,
     build_return_table,
     build_turnover_summary,
     collect_required_backtest_tickers,
     resolve_backtest_tickers,
     run_strategy_backtests,
     write_backtest_outputs,
+    write_rolling_metric_outputs,
 )
 
 
@@ -137,6 +139,7 @@ def test_build_summary_tables_and_write_outputs() -> None:
     nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
+    rolling_outputs = build_rolling_metric_outputs(return_table, window=2, periods_per_year=2)
 
     output_dir = Path("data/cache") / f"test_pipeline_outputs_{uuid.uuid4().hex}"
     try:
@@ -157,6 +160,9 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert "correlation_pairs" in risk_outputs
         assert "top_correlation_pairs" in risk_outputs
         assert "asset_risk_snapshot" in risk_outputs
+        assert "rolling_volatility" in rolling_outputs
+        assert "rolling_sharpe" in rolling_outputs
+        write_rolling_metric_outputs(rolling_outputs, output_dir)
         assert (output_dir / "performance_summary.csv").exists()
         assert (output_dir / "annual_return_table.csv").exists()
         assert (output_dir / "benchmark_annual_excess_returns.csv").exists()
@@ -167,5 +173,8 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert (output_dir / "correlation_pairs.csv").exists()
         assert (output_dir / "top_correlation_pairs.csv").exists()
         assert (output_dir / "asset_risk_snapshot.csv").exists()
+        assert (output_dir / "rolling_volatility.csv").exists()
+        assert (output_dir / "rolling_sharpe.csv").exists()
+        assert (output_dir / "drawdown_series.csv").exists()
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)

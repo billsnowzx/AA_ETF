@@ -113,3 +113,35 @@ def risk_summary(
         return pd.DataFrame(metrics)
 
     return pd.Series(metrics)
+
+
+def rolling_volatility(
+    returns: PandasLike,
+    window: int = 63,
+    periods_per_year: int = 252,
+    min_periods: int | None = None,
+) -> PandasLike:
+    """Compute annualized rolling volatility from simple returns."""
+    min_periods = window if min_periods is None else min_periods
+    return returns.rolling(window=window, min_periods=min_periods).std(ddof=1) * np.sqrt(periods_per_year)
+
+
+def rolling_sharpe_ratio(
+    returns: PandasLike,
+    window: int = 63,
+    periods_per_year: int = 252,
+    risk_free_rate: float = 0.0,
+    min_periods: int | None = None,
+) -> PandasLike:
+    """Compute annualized rolling Sharpe ratio from simple returns."""
+    min_periods = window if min_periods is None else min_periods
+    periodic_risk_free_rate = risk_free_rate / periods_per_year
+    excess_returns = returns - periodic_risk_free_rate
+    rolling_mean = excess_returns.rolling(window=window, min_periods=min_periods).mean() * periods_per_year
+    rolling_vol = rolling_volatility(
+        excess_returns,
+        window=window,
+        periods_per_year=periods_per_year,
+        min_periods=min_periods,
+    )
+    return rolling_mean / rolling_vol.replace(0.0, np.nan)

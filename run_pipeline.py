@@ -15,6 +15,8 @@ from src.analytics.correlation import (
     matrix_to_long_table,
     return_matrix_from_prices,
 )
+from src.analytics.drawdown import drawdown_from_returns
+from src.analytics.risk import rolling_sharpe_ratio, rolling_volatility
 from src.backtest.engine import run_fixed_weight_backtest
 from src.data.clean_data import batch_clean_price_frames
 from src.data.fetch_prices import fetch_prices
@@ -363,6 +365,42 @@ def build_return_table(
     )
 
 
+def build_rolling_metric_outputs(
+    return_table: pd.DataFrame,
+    window: int = 63,
+    periods_per_year: int = 252,
+) -> dict[str, pd.DataFrame]:
+    """Build rolling volatility, Sharpe, and drawdown output tables."""
+    return {
+        "rolling_volatility": rolling_volatility(
+            return_table,
+            window=window,
+            periods_per_year=periods_per_year,
+        ),
+        "rolling_sharpe": rolling_sharpe_ratio(
+            return_table,
+            window=window,
+            periods_per_year=periods_per_year,
+        ),
+        "drawdown_series": drawdown_from_returns(return_table),
+    }
+
+
+def write_rolling_metric_outputs(
+    rolling_outputs: dict[str, pd.DataFrame],
+    output_dir: str | Path,
+) -> None:
+    """Persist rolling metric outputs for the strategy and benchmarks."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    rolling_outputs["rolling_volatility"].to_csv(output_path / "rolling_volatility.csv", index=True)
+    rolling_outputs["rolling_sharpe"].to_csv(output_path / "rolling_sharpe.csv", index=True)
+    rolling_outputs["drawdown_series"].to_csv(output_path / "drawdown_series.csv", index=True)
+    LOGGER.info("Saved rolling volatility to %s", output_path / "rolling_volatility.csv")
+    LOGGER.info("Saved rolling Sharpe to %s", output_path / "rolling_sharpe.csv")
+    LOGGER.info("Saved drawdown series to %s", output_path / "drawdown_series.csv")
+
+
 def build_argument_parser() -> argparse.ArgumentParser:
     """Build the CLI for the Phase 1 pipeline runner."""
     parser = argparse.ArgumentParser(description="Run the Phase 1 ETF data pipeline.")
@@ -449,12 +487,17 @@ def main() -> None:
         asset_returns,
         args.output_dir,
     )
+    return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
+    rolling_outputs = build_rolling_metric_outputs(return_table)
+    write_rolling_metric_outputs(rolling_outputs, args.output_dir)
     chart_paths = write_phase1_chart_outputs(
         strategy_name,
         build_nav_table(strategy_name, strategy_result, benchmark_results),
         strategy_result["annual_return_table"],
         asset_returns,
         args.figure_dir,
+        rolling_volatility_table=rolling_outputs["rolling_volatility"],
+        rolling_sharpe_table=rolling_outputs["rolling_sharpe"],
     )
     LOGGER.info("Saved Phase 1 charts: %s", chart_paths)
 

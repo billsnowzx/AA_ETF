@@ -75,12 +75,33 @@ def save_correlation_heatmap(returns: pd.DataFrame, output_path: str | Path) -> 
     plt.close(figure)
 
 
+def save_rolling_metric_chart(
+    metric_table: pd.DataFrame,
+    output_path: str | Path,
+    title: str,
+    ylabel: str,
+) -> None:
+    """Save a rolling metric line chart."""
+    figure, axis = plt.subplots(figsize=(10, 6))
+    metric_table.plot(ax=axis, linewidth=2)
+    axis.set_title(title)
+    axis.set_xlabel("Date")
+    axis.set_ylabel(ylabel)
+    axis.grid(True, alpha=0.3)
+    axis.legend()
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
 def write_phase1_chart_outputs(
     strategy_name: str,
     nav_table: pd.DataFrame,
     annual_return_table: pd.DataFrame,
     asset_returns: pd.DataFrame,
     output_dir: str | Path,
+    rolling_volatility_table: pd.DataFrame | None = None,
+    rolling_sharpe_table: pd.DataFrame | None = None,
 ) -> dict[str, Path]:
     """Write the required Phase 1 charts to disk."""
     output_path = Path(output_dir)
@@ -92,9 +113,27 @@ def write_phase1_chart_outputs(
         "annual_return_chart": output_path / f"{strategy_name}_annual_returns.png",
         "correlation_heatmap": output_path / "correlation_heatmap.png",
     }
+    if rolling_volatility_table is not None and not rolling_volatility_table.empty:
+        chart_paths["rolling_volatility_chart"] = output_path / f"{strategy_name}_rolling_volatility.png"
+    if rolling_sharpe_table is not None and not rolling_sharpe_table.empty:
+        chart_paths["rolling_sharpe_chart"] = output_path / f"{strategy_name}_rolling_sharpe.png"
 
     save_nav_chart(nav_table, chart_paths["nav_chart"])
     save_drawdown_chart(nav_table, chart_paths["drawdown_chart"])
     save_annual_return_bar_chart(annual_return_table, chart_paths["annual_return_chart"])
     save_correlation_heatmap(asset_returns, chart_paths["correlation_heatmap"])
+    if "rolling_volatility_chart" in chart_paths:
+        save_rolling_metric_chart(
+            rolling_volatility_table,
+            chart_paths["rolling_volatility_chart"],
+            title="Rolling Volatility",
+            ylabel="Annualized Volatility",
+        )
+    if "rolling_sharpe_chart" in chart_paths:
+        save_rolling_metric_chart(
+            rolling_sharpe_table,
+            chart_paths["rolling_sharpe_chart"],
+            title="Rolling Sharpe Ratio",
+            ylabel="Sharpe Ratio",
+        )
     return chart_paths

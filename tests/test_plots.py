@@ -31,6 +31,20 @@ def test_write_phase1_chart_outputs_creates_required_pngs() -> None:
         },
         index=index,
     )
+    rolling_volatility = pd.DataFrame(
+        {
+            "balanced": [None, 0.10, 0.11, 0.12],
+            "benchmark_a": [None, 0.08, 0.09, 0.10],
+        },
+        index=index,
+    )
+    rolling_sharpe = pd.DataFrame(
+        {
+            "balanced": [None, 0.5, 0.6, 0.7],
+            "benchmark_a": [None, 0.4, 0.5, 0.6],
+        },
+        index=index,
+    )
 
     try:
         chart_paths = write_phase1_chart_outputs(
@@ -39,10 +53,14 @@ def test_write_phase1_chart_outputs_creates_required_pngs() -> None:
             annual_return_table,
             asset_returns,
             output_dir,
+            rolling_volatility_table=rolling_volatility,
+            rolling_sharpe_table=rolling_sharpe,
         )
         assert chart_paths["nav_chart"].exists()
         assert chart_paths["drawdown_chart"].exists()
         assert chart_paths["annual_return_chart"].exists()
         assert chart_paths["correlation_heatmap"].exists()
+        assert chart_paths["rolling_volatility_chart"].exists()
+        assert chart_paths["rolling_sharpe_chart"].exists()
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)

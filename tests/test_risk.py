@@ -6,6 +6,8 @@ from src.analytics.risk import (
     calmar_ratio,
     downside_volatility,
     risk_summary,
+    rolling_sharpe_ratio,
+    rolling_volatility,
     sharpe_ratio,
     sortino_ratio,
 )
@@ -57,3 +59,15 @@ def test_risk_summary_for_dataframe_contains_expected_metrics() -> None:
         "calmar_ratio",
     ]
     assert list(summary.index) == ["VTI", "AGG"]
+
+
+def test_rolling_volatility_and_sharpe_return_aligned_series() -> None:
+    returns = pd.Series([0.01, 0.02, -0.01, 0.00], index=pd.date_range("2024-01-01", periods=4))
+
+    vol = rolling_volatility(returns, window=2, periods_per_year=2)
+    sharpe = rolling_sharpe_ratio(returns, window=2, periods_per_year=2)
+
+    assert vol.index.equals(returns.index)
+    assert sharpe.index.equals(returns.index)
+    assert pd.isna(vol.iloc[0])
+    assert vol.iloc[-1] > 0

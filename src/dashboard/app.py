@@ -104,6 +104,16 @@ def _format_dashboard_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.Da
         if "observations" in frame.columns:
             frame["observations"] = frame["observations"].map(_format_integer)
 
+    if "rolling_volatility" in formatted:
+        frame = formatted["rolling_volatility"]
+        for column in frame.columns:
+            frame[column] = frame[column].map(_format_percent)
+
+    if "rolling_sharpe" in formatted:
+        frame = formatted["rolling_sharpe"]
+        for column in frame.columns:
+            frame[column] = frame[column].map(_format_decimal)
+
     return formatted
 
 
@@ -142,6 +152,8 @@ def build_dashboard_html(
     top_correlations = _read_csv_if_exists(output_path / "top_correlation_pairs.csv", index_col=None)
     asset_risk_snapshot = _read_csv_if_exists(output_path / "asset_risk_snapshot.csv")
     etf_summary = _read_csv_if_exists(output_path / "etf_summary.csv")
+    rolling_volatility = _read_csv_if_exists(output_path / "rolling_volatility.csv")
+    rolling_sharpe = _read_csv_if_exists(output_path / "rolling_sharpe.csv")
     formatted_tables = _format_dashboard_tables(
         {
             "performance_summary": performance_summary,
@@ -151,6 +163,8 @@ def build_dashboard_html(
             "top_correlation_pairs": top_correlations,
             "asset_risk_snapshot": asset_risk_snapshot,
             "etf_summary": etf_summary,
+            "rolling_volatility": rolling_volatility.tail(5),
+            "rolling_sharpe": rolling_sharpe.tail(5),
         }
     )
     performance_summary = formatted_tables["performance_summary"]
@@ -160,6 +174,8 @@ def build_dashboard_html(
     top_correlations = formatted_tables["top_correlation_pairs"]
     asset_risk_snapshot = formatted_tables["asset_risk_snapshot"]
     etf_summary = formatted_tables["etf_summary"]
+    rolling_volatility = formatted_tables["rolling_volatility"]
+    rolling_sharpe = formatted_tables["rolling_sharpe"]
 
     report_links = []
     for report_name in ["balanced_phase1_report.html", "balanced_phase1_report.md"]:
@@ -175,6 +191,8 @@ def build_dashboard_html(
         ("NAV", "balanced_nav.png"),
         ("Drawdown", "balanced_drawdown.png"),
         ("Annual Returns", "balanced_annual_returns.png"),
+        ("Rolling Volatility", "balanced_rolling_volatility.png"),
+        ("Rolling Sharpe", "balanced_rolling_sharpe.png"),
         ("Correlation Heatmap", "correlation_heatmap.png"),
     ]:
         figure_file = figure_path / filename
@@ -300,6 +318,14 @@ def build_dashboard_html(
       <section class="card">
         <h2>ETF Summary</h2>
         {dataframe_to_html_table(etf_summary)}
+      </section>
+      <section class="card">
+        <h2>Latest Rolling Volatility</h2>
+        {dataframe_to_html_table(rolling_volatility)}
+      </section>
+      <section class="card">
+        <h2>Latest Rolling Sharpe</h2>
+        {dataframe_to_html_table(rolling_sharpe)}
       </section>
     </div>
 

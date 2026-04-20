@@ -36,6 +36,12 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         pd.DataFrame({"avg_correlation": ["0.4389"], "variance": ["0.000129"]}, index=pd.Index(["VTI"])).to_csv(
             table_dir / "asset_risk_snapshot.csv"
         )
+        pd.DataFrame({"balanced": [0.10]}, index=pd.Index(["2024-01-01"], name="date")).to_csv(
+            table_dir / "rolling_volatility.csv"
+        )
+        pd.DataFrame({"balanced": [0.5]}, index=pd.Index(["2024-01-01"], name="date")).to_csv(
+            table_dir / "rolling_sharpe.csv"
+        )
         pd.DataFrame({"asset_class": ["us_equity"]}, index=pd.Index(["VTI"])).to_csv(table_dir / "etf_summary.csv")
         (figure_dir / "balanced_nav.png").write_bytes(b"fake")
         (report_dir / "balanced_phase1_report.html").write_text("<html></html>", encoding="utf-8")
@@ -48,6 +54,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "balanced_nav.png" in html
         assert "balanced_phase1_report.html" in html
         assert "10.00%" in html
+        assert "Latest Rolling Volatility" in html
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
 
@@ -70,6 +77,8 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
             ),
             "top_correlation_pairs": pd.DataFrame({"pair": ["VTI vs VEA"], "correlation": [0.8604]}),
             "asset_risk_snapshot": pd.DataFrame({"avg_correlation": [0.4389], "variance": [0.000129]}),
+            "rolling_volatility": pd.DataFrame({"balanced": [0.10]}),
+            "rolling_sharpe": pd.DataFrame({"balanced": [0.5]}),
             "etf_summary": pd.DataFrame(
                 {
                     "average_dollar_volume": [1_000_000.0],
@@ -88,6 +97,8 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["benchmark_drawdown_comparisons"].loc["benchmark_a", "max_drawdown_gap"] == "-5.00%"
     assert tables["top_correlation_pairs"].iloc[0]["correlation"] == "0.8604"
     assert tables["asset_risk_snapshot"].iloc[0]["variance"] == "0.000129"
+    assert tables["rolling_volatility"].iloc[0]["balanced"] == "10.00%"
+    assert tables["rolling_sharpe"].iloc[0]["balanced"] == "0.5000"
     assert tables["etf_summary"].loc["VTI", "average_dollar_volume"] == "1000000"
 
 
