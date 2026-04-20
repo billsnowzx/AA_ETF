@@ -537,7 +537,7 @@ def main() -> None:
     )
     clean_frames = batch_clean_price_frames(raw_frames)
     save_processed_frames(clean_frames, args.processed_dir)
-    write_data_quality_outputs(clean_frames, args.output_dir)
+    data_quality_summary = write_data_quality_outputs(clean_frames, args.output_dir)
 
     liquid_tickers, liquidity_table = filter_liquid_universe(clean_frames)
     etf_summary = score_etf_universe(args.universe_config, liquidity_table)
@@ -617,6 +617,7 @@ def main() -> None:
         benchmark_drawdown_comparisons=strategy_result["benchmark_drawdown_comparisons"],
         liquidity_table=liquidity_table,
         etf_summary=etf_summary,
+        data_quality_summary=data_quality_summary,
         covariance_matrix=risk_outputs["covariance_matrix"],
         correlation_matrix=risk_outputs["correlation_matrix"],
         correlation_pairs=risk_outputs["correlation_pairs"],
@@ -636,6 +637,7 @@ def main() -> None:
         benchmark_drawdown_comparisons=strategy_result["benchmark_drawdown_comparisons"],
         liquidity_table=liquidity_table,
         etf_summary=etf_summary,
+        data_quality_summary=data_quality_summary,
         covariance_matrix=risk_outputs["covariance_matrix"],
         correlation_matrix=risk_outputs["correlation_matrix"],
         correlation_pairs=risk_outputs["correlation_pairs"],

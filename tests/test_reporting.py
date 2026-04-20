@@ -34,6 +34,22 @@ def _sample_frame() -> pd.DataFrame:
     )
 
 
+def _sample_data_quality_summary() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "start_date": ["2024-01-02"],
+            "end_date": ["2024-01-03"],
+            "observations": [2],
+            "missing_adj_close": [0],
+            "missing_volume": [0],
+            "zero_volume": [0],
+            "missing_dollar_volume": [0],
+            "has_duplicate_dates": [False],
+        },
+        index=pd.Index(["VTI"], name="ticker"),
+    )
+
+
 def test_build_phase1_report_markdown_contains_key_sections() -> None:
     performance_summary = _sample_frame()
     turnover_summary = pd.DataFrame(
@@ -104,6 +120,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         benchmark_drawdown_comparisons=benchmark_drawdown_comparisons,
         liquidity_table=liquidity_table,
         etf_summary=etf_summary,
+        data_quality_summary=_sample_data_quality_summary(),
         covariance_matrix=covariance_matrix,
         correlation_matrix=correlation_matrix,
         correlation_pairs=correlation_pairs,
@@ -122,6 +139,8 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "## Benchmark Annual Excess Returns" in report
     assert "## Benchmark Drawdown Comparisons" in report
     assert "## Latest Rolling Metrics" in report
+    assert "## Data Quality Summary" in report
+    assert "missing_volume" in report
     assert "12.00%" in report
 
 
@@ -189,6 +208,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
         benchmark_drawdown_comparisons=benchmark_drawdown_comparisons,
         liquidity_table=liquidity_table,
         etf_summary=etf_summary,
+        data_quality_summary=_sample_data_quality_summary(),
         covariance_matrix=covariance_matrix,
         correlation_matrix=correlation_matrix,
         correlation_pairs=correlation_pairs,
@@ -207,6 +227,8 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "<h2>Benchmark Annual Excess Returns</h2>" in report
     assert "<h2>Benchmark Drawdown Comparisons</h2>" in report
     assert "<h2>Latest Rolling Metrics</h2>" in report
+    assert "<h2>Data Quality Summary</h2>" in report
+    assert "missing_volume" in report
     assert "12.00%" in report
 
 
@@ -329,6 +351,7 @@ def test_write_phase1_report_creates_markdown_file() -> None:
             benchmark_drawdown_comparisons=benchmark_drawdown_comparisons,
             liquidity_table=liquidity_table,
             etf_summary=etf_summary,
+            data_quality_summary=_sample_data_quality_summary(),
             covariance_matrix=covariance_matrix,
             correlation_matrix=correlation_matrix,
             correlation_pairs=correlation_pairs,
@@ -411,6 +434,7 @@ def test_write_phase1_html_report_creates_html_file() -> None:
             benchmark_drawdown_comparisons=benchmark_drawdown_comparisons,
             liquidity_table=liquidity_table,
             etf_summary=etf_summary,
+            data_quality_summary=_sample_data_quality_summary(),
             covariance_matrix=covariance_matrix,
             correlation_matrix=correlation_matrix,
             correlation_pairs=correlation_pairs,

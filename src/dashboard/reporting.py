@@ -148,6 +148,35 @@ def _format_rolling_metric_snapshot(snapshot: pd.DataFrame | None) -> pd.DataFra
     return formatted
 
 
+def _format_data_quality_summary(data_quality_summary: pd.DataFrame | None) -> pd.DataFrame:
+    """Format data-quality diagnostics for report presentation."""
+    if data_quality_summary is None or data_quality_summary.empty:
+        return pd.DataFrame()
+
+    columns = [
+        "start_date",
+        "end_date",
+        "observations",
+        "missing_adj_close",
+        "missing_volume",
+        "zero_volume",
+        "missing_dollar_volume",
+        "has_duplicate_dates",
+    ]
+    available_columns = [column for column in columns if column in data_quality_summary.columns]
+    formatted = data_quality_summary[available_columns].astype(object).copy()
+    for column in [
+        "observations",
+        "missing_adj_close",
+        "missing_volume",
+        "zero_volume",
+        "missing_dollar_volume",
+    ]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(lambda value: _format_decimal(value, digits=0))
+    return formatted
+
+
 def build_phase1_report_markdown(
     strategy_name: str,
     performance_summary: pd.DataFrame,
@@ -163,6 +192,7 @@ def build_phase1_report_markdown(
     correlation_pairs: pd.DataFrame,
     chart_paths: dict[str, Path],
     report_date: str,
+    data_quality_summary: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
@@ -236,6 +266,7 @@ def build_phase1_report_markdown(
     correlation_summary = risk_summary_tables["top_correlation_pairs"]
     asset_risk_snapshot = risk_summary_tables["asset_risk_snapshot"]
     rolling_view = _format_rolling_metric_snapshot(rolling_metric_snapshot)
+    data_quality_view = _format_data_quality_summary(data_quality_summary)
 
     note_lines = "\n".join(f"- {note}" for note in notes) if notes else "- None"
     figure_lines = "\n".join(f"- `{name}`: `{path.as_posix()}`" for name, path in chart_paths.items())
@@ -290,6 +321,10 @@ Generated: {report_date}
 
 {dataframe_to_markdown_table(etf_view)}
 
+## Data Quality Summary
+
+{dataframe_to_markdown_table(data_quality_view) if not data_quality_view.empty else "No data quality summary generated."}
+
 ## Correlation Highlights
 
 {dataframe_to_markdown_table(correlation_summary) if not correlation_summary.empty else "No non-diagonal correlation pairs available."}
@@ -320,6 +355,7 @@ def build_phase1_report_html(
     correlation_pairs: pd.DataFrame,
     chart_paths: dict[str, Path],
     report_date: str,
+    data_quality_summary: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
@@ -393,6 +429,7 @@ def build_phase1_report_html(
     correlation_summary = risk_summary_tables["top_correlation_pairs"]
     asset_risk_snapshot = risk_summary_tables["asset_risk_snapshot"]
     rolling_view = _format_rolling_metric_snapshot(rolling_metric_snapshot)
+    data_quality_view = _format_data_quality_summary(data_quality_summary)
 
     note_items = "".join(f"<li>{escape(note)}</li>" for note in notes) if notes else "<li>None</li>"
     figure_items = "".join(
@@ -446,6 +483,7 @@ def build_phase1_report_html(
   <section><h2>Benchmark Drawdown Comparisons</h2>{dataframe_to_html_table(drawdown_view) if not drawdown_view.empty else "<p>No benchmark drawdown comparisons generated.</p>"}</section>
   <section><h2>Latest Rolling Metrics</h2>{dataframe_to_html_table(rolling_view) if not rolling_view.empty else "<p>No rolling metrics generated.</p>"}</section>
   <section><h2>ETF Summary</h2>{dataframe_to_html_table(etf_view)}</section>
+  <section><h2>Data Quality Summary</h2>{dataframe_to_html_table(data_quality_view) if not data_quality_view.empty else "<p>No data quality summary generated.</p>"}</section>
   <section><h2>Correlation Highlights</h2>{dataframe_to_html_table(correlation_summary) if not correlation_summary.empty else "<p>No non-diagonal correlation pairs available.</p>"}</section>
   <section><h2>Asset Risk Snapshot</h2>{dataframe_to_html_table(asset_risk_snapshot) if not asset_risk_snapshot.empty else "<p>No asset risk snapshot available.</p>"}</section>
   <section><h2>Figures</h2><ul>{figure_items}</ul></section>
@@ -470,6 +508,7 @@ def write_phase1_report(
     chart_paths: dict[str, Path],
     output_path: str | Path,
     report_date: str,
+    data_quality_summary: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
@@ -486,6 +525,7 @@ def write_phase1_report(
         benchmark_drawdown_comparisons=benchmark_drawdown_comparisons,
         liquidity_table=liquidity_table,
         etf_summary=etf_summary,
+        data_quality_summary=data_quality_summary,
         covariance_matrix=covariance_matrix,
         correlation_matrix=correlation_matrix,
         correlation_pairs=correlation_pairs,
@@ -514,6 +554,7 @@ def write_phase1_html_report(
     chart_paths: dict[str, Path],
     output_path: str | Path,
     report_date: str,
+    data_quality_summary: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
@@ -530,6 +571,7 @@ def write_phase1_html_report(
         benchmark_drawdown_comparisons=benchmark_drawdown_comparisons,
         liquidity_table=liquidity_table,
         etf_summary=etf_summary,
+        data_quality_summary=data_quality_summary,
         covariance_matrix=covariance_matrix,
         correlation_matrix=correlation_matrix,
         correlation_pairs=correlation_pairs,
