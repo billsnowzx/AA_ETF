@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from run_pipeline import build_argument_parser, save_processed_frames, write_liquidity_outputs
+from run_pipeline import (
+    build_argument_parser,
+    save_processed_frames,
+    write_data_quality_outputs,
+    write_liquidity_outputs,
+)
 
 
 def test_argument_parser_exposes_rolling_window_default_and_override() -> None:
@@ -28,6 +33,22 @@ def test_save_processed_frames_writes_per_ticker_csv() -> None:
     try:
         save_processed_frames({"VTI": frame}, output_dir)
         assert (output_dir / "VTI.csv").exists()
+    finally:
+        shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_write_data_quality_outputs_writes_summary_file() -> None:
+    output_dir = Path("data/cache") / f"test_data_quality_outputs_{uuid.uuid4().hex}"
+    frame = pd.DataFrame(
+        {"adj_close": [100.0], "volume": [1000.0], "dollar_volume": [100000.0]},
+        index=pd.to_datetime(["2024-01-02"]),
+    )
+    frame.index.name = "date"
+
+    try:
+        summary = write_data_quality_outputs({"VTI": frame}, output_dir)
+        assert (output_dir / "data_quality_summary.csv").exists()
+        assert summary.loc["VTI", "observations"] == 1
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
 

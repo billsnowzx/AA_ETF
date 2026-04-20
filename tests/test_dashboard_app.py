@@ -49,6 +49,15 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
             table_dir / "rolling_sharpe.csv"
         )
         pd.DataFrame({"asset_class": ["us_equity"]}, index=pd.Index(["VTI"])).to_csv(table_dir / "etf_summary.csv")
+        pd.DataFrame(
+            {
+                "start_date": ["2024-01-02"],
+                "end_date": ["2024-01-03"],
+                "observations": [2],
+                "missing_volume": [0],
+            },
+            index=pd.Index(["VTI"], name="ticker"),
+        ).to_csv(table_dir / "data_quality_summary.csv")
         (table_dir / "pipeline_manifest.json").write_text(
             json.dumps(
                 {
@@ -79,6 +88,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Latest Rolling Volatility" in html
         assert "Run Manifest" in html
         assert "liquidity_filtered" in html
+        assert "Data Quality Summary" in html
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
 
@@ -104,6 +114,7 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
             "rolling_volatility": pd.DataFrame({"balanced": [0.10]}),
             "rolling_sharpe": pd.DataFrame({"balanced": [0.5]}),
             "manifest_summary": pd.DataFrame({"value": [1.25]}, index=pd.Index(["ending_nav"])),
+            "data_quality_summary": pd.DataFrame({"observations": [2], "missing_volume": [0]}),
             "etf_summary": pd.DataFrame(
                 {
                     "average_dollar_volume": [1_000_000.0],
@@ -125,6 +136,7 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["rolling_volatility"].iloc[0]["balanced"] == "10.00%"
     assert tables["rolling_sharpe"].iloc[0]["balanced"] == "0.5000"
     assert tables["manifest_summary"].loc["ending_nav", "value"] == "1.2500"
+    assert tables["data_quality_summary"].iloc[0]["observations"] == "2"
     assert tables["etf_summary"].loc["VTI", "average_dollar_volume"] == "1000000"
 
 

@@ -104,6 +104,7 @@ This command will:
 - save cleaned per-ticker data into `data/processed/`
 - generate `outputs/tables/liquidity_summary.csv`
 - generate `outputs/tables/etf_summary.csv`
+- generate `outputs/tables/data_quality_summary.csv`
 - generate `outputs/tables/investable_universe.csv`
 - run the default strategic portfolio plus configured benchmarks
 - generate `performance_summary.csv`, `annual_return_table.csv`, `turnover_summary.csv`, `benchmark_comparisons.csv`, `nav_series.csv`, and `return_series.csv`

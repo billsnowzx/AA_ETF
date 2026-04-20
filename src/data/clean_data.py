@@ -93,6 +93,61 @@ def batch_clean_price_frames(
     }
 
 
+def build_data_quality_summary(frames: Mapping[str, pd.DataFrame]) -> pd.DataFrame:
+    """Build an auditable data-quality summary from cleaned price frames."""
+    rows: list[dict[str, object]] = []
+    for ticker, frame in frames.items():
+        if frame.empty:
+            rows.append(
+                {
+                    "ticker": ticker,
+                    "start_date": None,
+                    "end_date": None,
+                    "observations": 0,
+                    "missing_adj_close": 0,
+                    "missing_volume": 0,
+                    "zero_volume": 0,
+                    "missing_dollar_volume": 0,
+                    "has_duplicate_dates": False,
+                }
+            )
+            continue
+
+        indexed = ensure_datetime_index(frame)
+        validate_required_columns(indexed, required_columns=["adj_close", "volume", "dollar_volume"])
+        volume = pd.to_numeric(indexed["volume"], errors="coerce")
+
+        rows.append(
+            {
+                "ticker": ticker,
+                "start_date": indexed.index.min().strftime("%Y-%m-%d"),
+                "end_date": indexed.index.max().strftime("%Y-%m-%d"),
+                "observations": int(len(indexed)),
+                "missing_adj_close": int(indexed["adj_close"].isna().sum()),
+                "missing_volume": int(volume.isna().sum()),
+                "zero_volume": int((volume == 0).sum()),
+                "missing_dollar_volume": int(indexed["dollar_volume"].isna().sum()),
+                "has_duplicate_dates": bool(indexed.index.duplicated().any()),
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame(
+            columns=[
+                "start_date",
+                "end_date",
+                "observations",
+                "missing_adj_close",
+                "missing_volume",
+                "zero_volume",
+                "missing_dollar_volume",
+                "has_duplicate_dates",
+            ]
+        )
+
+    return pd.DataFrame(rows).set_index("ticker").sort_index()
+
+
 def combine_price_frames(frames: Mapping[str, pd.DataFrame]) -> pd.DataFrame:
     """Combine multiple cleaned price frames into a single long DataFrame."""
     if not frames:

@@ -135,6 +135,12 @@ def _format_dashboard_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.Da
         if "observations" in frame.columns:
             frame["observations"] = frame["observations"].map(_format_integer)
 
+    if "data_quality_summary" in formatted:
+        frame = formatted["data_quality_summary"]
+        for column in ["observations", "missing_adj_close", "missing_volume", "zero_volume", "missing_dollar_volume"]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_integer)
+
     if "rolling_volatility" in formatted:
         frame = formatted["rolling_volatility"]
         for column in frame.columns:
@@ -189,6 +195,7 @@ def build_dashboard_html(
     top_correlations = _read_csv_if_exists(output_path / "top_correlation_pairs.csv", index_col=None)
     asset_risk_snapshot = _read_csv_if_exists(output_path / "asset_risk_snapshot.csv")
     etf_summary = _read_csv_if_exists(output_path / "etf_summary.csv")
+    data_quality_summary = _read_csv_if_exists(output_path / "data_quality_summary.csv")
     rolling_volatility = _read_csv_if_exists(output_path / "rolling_volatility.csv")
     rolling_sharpe = _read_csv_if_exists(output_path / "rolling_sharpe.csv")
     manifest_summary = _build_manifest_summary(_read_json_if_exists(output_path / "pipeline_manifest.json"))
@@ -201,6 +208,7 @@ def build_dashboard_html(
             "top_correlation_pairs": top_correlations,
             "asset_risk_snapshot": asset_risk_snapshot,
             "etf_summary": etf_summary,
+            "data_quality_summary": data_quality_summary,
             "rolling_volatility": rolling_volatility.tail(5),
             "rolling_sharpe": rolling_sharpe.tail(5),
             "manifest_summary": manifest_summary,
@@ -213,6 +221,7 @@ def build_dashboard_html(
     top_correlations = formatted_tables["top_correlation_pairs"]
     asset_risk_snapshot = formatted_tables["asset_risk_snapshot"]
     etf_summary = formatted_tables["etf_summary"]
+    data_quality_summary = formatted_tables["data_quality_summary"]
     rolling_volatility = formatted_tables["rolling_volatility"]
     rolling_sharpe = formatted_tables["rolling_sharpe"]
     manifest_summary = formatted_tables["manifest_summary"]
@@ -362,6 +371,10 @@ def build_dashboard_html(
       <section class="card">
         <h2>ETF Summary</h2>
         {dataframe_to_html_table(etf_summary)}
+      </section>
+      <section class="card">
+        <h2>Data Quality Summary</h2>
+        {dataframe_to_html_table(data_quality_summary)}
       </section>
       <section class="card">
         <h2>Latest Rolling Volatility</h2>

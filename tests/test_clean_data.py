@@ -1,7 +1,12 @@
 import pandas as pd
 import pytest
 
-from src.data.clean_data import batch_clean_price_frames, clean_price_frame, compute_dollar_volume
+from src.data.clean_data import (
+    batch_clean_price_frames,
+    build_data_quality_summary,
+    clean_price_frame,
+    compute_dollar_volume,
+)
 
 
 def test_clean_price_frame_sorts_deduplicates_and_drops_missing_adj_close() -> None:
@@ -63,3 +68,25 @@ def test_clean_price_frame_requires_standard_columns() -> None:
 
     with pytest.raises(ValueError, match="Missing required columns"):
         clean_price_frame(frame)
+
+
+def test_build_data_quality_summary_reports_missing_and_zero_volume() -> None:
+    frame = pd.DataFrame(
+        {
+            "date": ["2024-01-02", "2024-01-03", "2024-01-04"],
+            "adj_close": [100.0, 101.0, 102.0],
+            "volume": [1000.0, 0.0, None],
+            "dollar_volume": [100000.0, 0.0, None],
+        }
+    )
+
+    summary = build_data_quality_summary({"VTI": frame})
+
+    assert summary.loc["VTI", "start_date"] == "2024-01-02"
+    assert summary.loc["VTI", "end_date"] == "2024-01-04"
+    assert summary.loc["VTI", "observations"] == 3
+    assert summary.loc["VTI", "missing_adj_close"] == 0
+    assert summary.loc["VTI", "missing_volume"] == 1
+    assert summary.loc["VTI", "zero_volume"] == 1
+    assert summary.loc["VTI", "missing_dollar_volume"] == 1
+    assert bool(summary.loc["VTI", "has_duplicate_dates"]) is False

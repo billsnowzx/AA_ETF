@@ -19,7 +19,7 @@ from src.analytics.correlation import (
 from src.analytics.drawdown import drawdown_from_returns
 from src.analytics.risk import rolling_sharpe_ratio, rolling_volatility
 from src.backtest.engine import run_fixed_weight_backtest
-from src.data.clean_data import batch_clean_price_frames
+from src.data.clean_data import batch_clean_price_frames, build_data_quality_summary
 from src.data.fetch_prices import fetch_prices
 from src.dashboard.plots import write_phase1_chart_outputs
 from src.dashboard.reporting import (
@@ -159,6 +159,20 @@ def write_liquidity_outputs(
     LOGGER.info("Saved liquidity summary to %s", liquidity_summary_path)
     LOGGER.info("Saved ETF summary to %s", etf_summary_path)
     LOGGER.info("Saved investable universe to %s", investable_universe_path)
+
+
+def write_data_quality_outputs(
+    clean_frames: dict[str, pd.DataFrame],
+    output_dir: str | Path,
+) -> pd.DataFrame:
+    """Persist per-ticker data-quality diagnostics and return the summary table."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    data_quality_summary = build_data_quality_summary(clean_frames)
+    data_quality_path = output_path / "data_quality_summary.csv"
+    data_quality_summary.to_csv(data_quality_path, index=True)
+    LOGGER.info("Saved data quality summary to %s", data_quality_path)
+    return data_quality_summary
 
 
 def run_strategy_backtests(
@@ -523,6 +537,7 @@ def main() -> None:
     )
     clean_frames = batch_clean_price_frames(raw_frames)
     save_processed_frames(clean_frames, args.processed_dir)
+    write_data_quality_outputs(clean_frames, args.output_dir)
 
     liquid_tickers, liquidity_table = filter_liquid_universe(clean_frames)
     etf_summary = score_etf_universe(args.universe_config, liquidity_table)
