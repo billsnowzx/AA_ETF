@@ -18,6 +18,95 @@ def _read_csv_if_exists(path: Path, index_col: int | str | None = 0) -> pd.DataF
     return pd.read_csv(path, index_col=index_col)
 
 
+def _format_percent(value: object) -> str:
+    """Format a decimal value as a percent string when numeric."""
+    if pd.isna(value):
+        return "n/a"
+    return f"{float(value):.2%}"
+
+
+def _format_decimal(value: object, digits: int = 4) -> str:
+    """Format a numeric value as a fixed-point decimal string when numeric."""
+    if pd.isna(value):
+        return "n/a"
+    return f"{float(value):.{digits}f}"
+
+
+def _format_integer(value: object) -> str:
+    """Format a numeric value as an integer string when numeric."""
+    if pd.isna(value):
+        return "n/a"
+    return f"{int(round(float(value)))}"
+
+
+def _format_dashboard_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """Format dashboard tables into human-readable display values."""
+    formatted = {name: frame.copy() for name, frame in tables.items()}
+
+    if "performance_summary" in formatted:
+        frame = formatted["performance_summary"]
+        for column in [
+            "annualized_return",
+            "annualized_volatility",
+            "downside_volatility",
+            "max_drawdown",
+            "total_transaction_cost_drag",
+        ]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_percent)
+        for column in ["sharpe_ratio", "sortino_ratio", "calmar_ratio", "ending_nav", "total_turnover"]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_decimal)
+
+    if "benchmark_comparisons" in formatted:
+        frame = formatted["benchmark_comparisons"]
+        for column in [
+            "strategy_annualized_return",
+            "benchmark_annualized_return",
+            "annualized_excess_return",
+            "tracking_error",
+        ]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_percent)
+        if "information_ratio" in frame.columns:
+            frame["information_ratio"] = frame["information_ratio"].map(_format_decimal)
+
+    for name in ["benchmark_annual_excess_returns", "benchmark_drawdown_comparisons"]:
+        if name in formatted:
+            frame = formatted[name]
+            for column in frame.columns:
+                frame[column] = frame[column].map(_format_percent)
+
+    if "top_correlation_pairs" in formatted:
+        frame = formatted["top_correlation_pairs"]
+        if "correlation" in frame.columns:
+            frame["correlation"] = frame["correlation"].map(_format_decimal)
+
+    if "asset_risk_snapshot" in formatted:
+        frame = formatted["asset_risk_snapshot"]
+        if "avg_correlation" in frame.columns:
+            frame["avg_correlation"] = frame["avg_correlation"].map(_format_decimal)
+        if "variance" in frame.columns:
+            frame["variance"] = frame["variance"].map(lambda value: _format_decimal(value, digits=6))
+
+    if "etf_summary" in formatted:
+        frame = formatted["etf_summary"]
+        for column in ["average_dollar_volume", "latest_rolling_average_dollar_volume"]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_integer)
+        if "recent_pass_ratio" in frame.columns:
+            frame["recent_pass_ratio"] = frame["recent_pass_ratio"].map(_format_percent)
+        for column in ["liquidity_score", "data_quality_score", "strategy_fit_score", "phase1_total_score"]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_decimal)
+        if "phase1_score_pct" in frame.columns:
+            frame["phase1_score_pct"] = frame["phase1_score_pct"].map(_format_percent)
+        if "observations" in frame.columns:
+            frame["observations"] = frame["observations"].map(_format_integer)
+
+    return formatted
+
+
 def dataframe_to_html_table(frame: pd.DataFrame) -> str:
     """Render a DataFrame to a simple HTML table."""
     if frame.empty:
@@ -53,6 +142,24 @@ def build_dashboard_html(
     top_correlations = _read_csv_if_exists(output_path / "top_correlation_pairs.csv", index_col=None)
     asset_risk_snapshot = _read_csv_if_exists(output_path / "asset_risk_snapshot.csv")
     etf_summary = _read_csv_if_exists(output_path / "etf_summary.csv")
+    formatted_tables = _format_dashboard_tables(
+        {
+            "performance_summary": performance_summary,
+            "benchmark_comparisons": benchmark_comparisons,
+            "benchmark_annual_excess_returns": annual_excess,
+            "benchmark_drawdown_comparisons": drawdown_comparisons,
+            "top_correlation_pairs": top_correlations,
+            "asset_risk_snapshot": asset_risk_snapshot,
+            "etf_summary": etf_summary,
+        }
+    )
+    performance_summary = formatted_tables["performance_summary"]
+    benchmark_comparisons = formatted_tables["benchmark_comparisons"]
+    annual_excess = formatted_tables["benchmark_annual_excess_returns"]
+    drawdown_comparisons = formatted_tables["benchmark_drawdown_comparisons"]
+    top_correlations = formatted_tables["top_correlation_pairs"]
+    asset_risk_snapshot = formatted_tables["asset_risk_snapshot"]
+    etf_summary = formatted_tables["etf_summary"]
 
     report_links = []
     for report_name in ["balanced_phase1_report.html", "balanced_phase1_report.md"]:

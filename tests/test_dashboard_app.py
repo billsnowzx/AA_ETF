@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.dashboard.app import build_dashboard_html, write_dashboard_html
+from src.dashboard.app import _format_dashboard_tables, build_dashboard_html, write_dashboard_html
 
 
 def test_build_dashboard_html_contains_tables_and_figures() -> None:
@@ -47,8 +47,48 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Benchmark Annual Excess Returns" in html
         assert "balanced_nav.png" in html
         assert "balanced_phase1_report.html" in html
+        assert "10.00%" in html
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
+    tables = _format_dashboard_tables(
+        {
+            "performance_summary": pd.DataFrame(
+                {"annualized_return": [0.1], "ending_nav": [1.5]},
+                index=pd.Index(["balanced"]),
+            ),
+            "benchmark_comparisons": pd.DataFrame(
+                {"tracking_error": [0.02], "information_ratio": [0.5]},
+                index=pd.Index(["benchmark_a"]),
+            ),
+            "benchmark_annual_excess_returns": pd.DataFrame({"benchmark_a": [0.01]}, index=pd.Index([2024])),
+            "benchmark_drawdown_comparisons": pd.DataFrame(
+                {"max_drawdown_gap": [-0.05]},
+                index=pd.Index(["benchmark_a"]),
+            ),
+            "top_correlation_pairs": pd.DataFrame({"pair": ["VTI vs VEA"], "correlation": [0.8604]}),
+            "asset_risk_snapshot": pd.DataFrame({"avg_correlation": [0.4389], "variance": [0.000129]}),
+            "etf_summary": pd.DataFrame(
+                {
+                    "average_dollar_volume": [1_000_000.0],
+                    "recent_pass_ratio": [1.0],
+                    "phase1_score_pct": [1.0],
+                    "observations": [2839],
+                },
+                index=pd.Index(["VTI"]),
+            ),
+        }
+    )
+
+    assert tables["performance_summary"].loc["balanced", "annualized_return"] == "10.00%"
+    assert tables["benchmark_comparisons"].loc["benchmark_a", "tracking_error"] == "2.00%"
+    assert tables["benchmark_annual_excess_returns"].loc[2024, "benchmark_a"] == "1.00%"
+    assert tables["benchmark_drawdown_comparisons"].loc["benchmark_a", "max_drawdown_gap"] == "-5.00%"
+    assert tables["top_correlation_pairs"].iloc[0]["correlation"] == "0.8604"
+    assert tables["asset_risk_snapshot"].iloc[0]["variance"] == "0.000129"
+    assert tables["etf_summary"].loc["VTI", "average_dollar_volume"] == "1000000"
 
 
 def test_write_dashboard_html_creates_file() -> None:
