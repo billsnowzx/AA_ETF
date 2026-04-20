@@ -436,12 +436,14 @@ def build_pipeline_manifest(
     liquid_tickers: list[str],
     backtest_tickers: list[str],
     strategy_name: str,
+    template_name: str | None,
     backtest_universe_mode: str,
     rolling_window: int,
     performance_summary: pd.DataFrame,
     table_paths: dict[str, Path] | None,
     report_paths: list[Path],
     chart_paths: dict[str, Path],
+    config_paths: dict[str, str | Path],
     output_dir: str | Path,
     raw_dir: str | Path,
     processed_dir: str | Path,
@@ -461,6 +463,11 @@ def build_pipeline_manifest(
         "parameters": {
             "backtest_universe_mode": backtest_universe_mode,
             "rolling_window": rolling_window,
+            "template_name": template_name,
+        },
+        "config_files": {
+            name: str(Path(path))
+            for name, path in config_paths.items()
         },
         "universes": {
             "enabled_tickers": enabled_tickers,
@@ -670,12 +677,19 @@ def main() -> None:
         liquid_tickers=liquid_tickers,
         backtest_tickers=backtest_tickers,
         strategy_name=strategy_name,
+        template_name=args.template_name,
         backtest_universe_mode=args.backtest_universe_mode,
         rolling_window=args.rolling_window,
         performance_summary=performance_summary,
         table_paths=collect_table_output_paths(args.output_dir),
         report_paths=[report_path, html_report_path],
         chart_paths=chart_paths,
+        config_paths={
+            "universe": args.universe_config,
+            "portfolio_templates": args.portfolio_config,
+            "benchmarks": args.benchmark_config,
+            "rebalance_rules": args.rebalance_config,
+        },
         output_dir=args.output_dir,
         raw_dir=args.raw_dir,
         processed_dir=args.processed_dir,

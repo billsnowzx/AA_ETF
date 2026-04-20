@@ -201,12 +201,19 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         liquid_tickers=["VTI", "AGG"],
         backtest_tickers=["VTI", "AGG"],
         strategy_name="balanced",
+        template_name="balanced",
         backtest_universe_mode="liquidity_filtered",
         rolling_window=21,
         performance_summary=performance_summary,
         table_paths={"performance_summary": Path("outputs/tables/performance_summary.csv")},
         report_paths=[Path("outputs/reports/balanced_phase1_report.md")],
         chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
+        config_paths={
+            "universe": "config/etf_universe.yaml",
+            "portfolio_templates": "config/portfolio_templates.yaml",
+            "benchmarks": "config/benchmark_config.yaml",
+            "rebalance_rules": "config/rebalance_rules.yaml",
+        },
         output_dir="outputs/tables",
         raw_dir="data/raw",
         processed_dir="data/processed",
@@ -221,7 +228,9 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
 
         assert loaded["parameters"]["rolling_window"] == 21
+        assert loaded["parameters"]["template_name"] == "balanced"
         assert loaded["parameters"]["backtest_universe_mode"] == "liquidity_filtered"
+        assert loaded["config_files"]["universe"] == "config\\etf_universe.yaml"
         assert loaded["universes"]["backtest_tickers"] == ["VTI", "AGG"]
         assert loaded["strategy"]["ending_nav"] == 1.25
         assert loaded["outputs"]["tables"]["performance_summary"] == "outputs\\tables\\performance_summary.csv"
