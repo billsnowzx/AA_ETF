@@ -203,6 +203,7 @@ def build_dashboard_html(
     asset_risk_snapshot = _read_csv_if_exists(output_path / "asset_risk_snapshot.csv")
     etf_summary = _read_csv_if_exists(output_path / "etf_summary.csv")
     data_quality_summary = _read_csv_if_exists(output_path / "data_quality_summary.csv")
+    run_configuration = _read_csv_if_exists(output_path / "run_configuration.csv")
     rolling_volatility = _read_csv_if_exists(output_path / "rolling_volatility.csv")
     rolling_sharpe = _read_csv_if_exists(output_path / "rolling_sharpe.csv")
     manifest_summary = _build_manifest_summary(_read_json_if_exists(output_path / "pipeline_manifest.json"))
@@ -216,6 +217,7 @@ def build_dashboard_html(
             "asset_risk_snapshot": asset_risk_snapshot,
             "etf_summary": etf_summary,
             "data_quality_summary": data_quality_summary,
+            "run_configuration": run_configuration,
             "rolling_volatility": rolling_volatility.tail(5),
             "rolling_sharpe": rolling_sharpe.tail(5),
             "manifest_summary": manifest_summary,
@@ -229,6 +231,7 @@ def build_dashboard_html(
     asset_risk_snapshot = formatted_tables["asset_risk_snapshot"]
     etf_summary = formatted_tables["etf_summary"]
     data_quality_summary = formatted_tables["data_quality_summary"]
+    run_configuration = formatted_tables["run_configuration"]
     rolling_volatility = formatted_tables["rolling_volatility"]
     rolling_sharpe = formatted_tables["rolling_sharpe"]
     manifest_summary = formatted_tables["manifest_summary"]
@@ -350,6 +353,10 @@ def build_dashboard_html(
       <section class="card">
         <h2>Run Manifest</h2>
         {dataframe_to_html_table(manifest_summary)}
+      </section>
+      <section class="card">
+        <h2>Run Configuration</h2>
+        {dataframe_to_html_table(run_configuration)}
       </section>
       <section class="card">
         <h2>Performance Summary</h2>
