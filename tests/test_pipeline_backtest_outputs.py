@@ -10,6 +10,7 @@ from run_pipeline import (
     build_asset_return_matrix,
     build_nav_table,
     build_backtest_policy_tables,
+    build_output_inventory,
     build_performance_summary,
     build_pipeline_manifest,
     build_risk_matrix_outputs,
@@ -21,6 +22,7 @@ from run_pipeline import (
     resolve_backtest_tickers,
     run_strategy_backtests,
     write_backtest_outputs,
+    write_output_inventory,
     write_pipeline_manifest,
     write_run_configuration_output,
     write_rolling_metric_outputs,
@@ -277,5 +279,43 @@ def test_write_run_configuration_output_creates_auditable_csv() -> None:
         assert loaded.loc["start", "value"] == "2024-01-01"
         assert loaded.loc["config_universe", "value"] == "config\\etf_universe.yaml"
         assert table_paths["run_configuration"] == output_path
+    finally:
+        shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_build_and_write_output_inventory_records_existing_outputs() -> None:
+    output_dir = Path("data/cache") / f"test_output_inventory_{uuid.uuid4().hex}"
+    table_path = output_dir / "performance_summary.csv"
+    report_path = output_dir / "balanced_phase1_report.md"
+    figure_path = output_dir / "balanced_nav.png"
+    manifest_path = output_dir / "pipeline_manifest.json"
+
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        table_path.write_text("portfolio,ending_nav\nbalanced,1.25\n", encoding="utf-8")
+        report_path.write_text("# report\n", encoding="utf-8")
+        figure_path.write_bytes(b"png")
+        manifest_path.write_text("{}\n", encoding="utf-8")
+
+        inventory = build_output_inventory(
+            table_paths={"performance_summary": table_path},
+            report_paths=[report_path],
+            chart_paths={"nav_chart": figure_path},
+            manifest_path=manifest_path,
+        )
+        output_path = write_output_inventory(inventory, output_dir)
+        loaded = pd.read_csv(output_path)
+
+        table_row = loaded.loc[loaded["name"] == "performance_summary"].iloc[0]
+        report_row = loaded.loc[loaded["name"] == "balanced_phase1_report"].iloc[0]
+        figure_row = loaded.loc[loaded["name"] == "nav_chart"].iloc[0]
+        manifest_row = loaded.loc[loaded["name"] == "pipeline_manifest"].iloc[0]
+
+        assert output_path == output_dir / "output_inventory.csv"
+        assert bool(table_row["exists"]) is True
+        assert table_row["size_bytes"] == table_path.stat().st_size
+        assert report_row["output_type"] == "report"
+        assert figure_row["output_type"] == "figure"
+        assert manifest_row["output_type"] == "manifest"
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)

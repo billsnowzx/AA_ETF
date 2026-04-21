@@ -115,6 +115,7 @@ This command will:
 - generate `top_correlation_pairs.csv` and `asset_risk_snapshot.csv`
 - generate `backtest_universe_validation.csv` and `backtest_universe_policy_summary.csv`
 - generate `run_configuration.csv` with CLI parameters and config file inputs for auditability
+- generate `output_inventory.csv` with existence and file-size checks for generated artifacts
 - generate `pipeline_manifest.json` with run parameters, selected universes, and output paths
 - generate the required Phase 1 charts under `outputs/figures/`
 - generate Markdown and HTML reports under `outputs/reports/`

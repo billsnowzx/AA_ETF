@@ -442,6 +442,49 @@ def collect_table_output_paths(output_dir: str | Path) -> dict[str, Path]:
     }
 
 
+def build_output_inventory(
+    *,
+    table_paths: dict[str, Path],
+    report_paths: list[Path],
+    chart_paths: dict[str, Path],
+    manifest_path: Path,
+) -> pd.DataFrame:
+    """Build a file-existence and size audit table for generated outputs."""
+    rows: list[dict[str, object]] = []
+
+    def add_row(output_type: str, name: str, path: Path) -> None:
+        exists = path.exists()
+        rows.append(
+            {
+                "output_type": output_type,
+                "name": name,
+                "path": str(path),
+                "exists": exists,
+                "size_bytes": path.stat().st_size if exists else 0,
+            }
+        )
+
+    for name, path in sorted(table_paths.items()):
+        add_row("table", name, Path(path))
+    for path in report_paths:
+        add_row("report", Path(path).stem, Path(path))
+    for name, path in sorted(chart_paths.items()):
+        add_row("figure", name, Path(path))
+    add_row("manifest", manifest_path.stem, manifest_path)
+
+    return pd.DataFrame(rows, columns=["output_type", "name", "path", "exists", "size_bytes"])
+
+
+def write_output_inventory(inventory: pd.DataFrame, output_dir: str | Path) -> Path:
+    """Persist output inventory as an auditable CSV."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    inventory_path = output_path / "output_inventory.csv"
+    inventory.to_csv(inventory_path, index=False)
+    LOGGER.info("Saved output inventory to %s", inventory_path)
+    return inventory_path
+
+
 def build_pipeline_manifest(
     *,
     start: str,
@@ -703,6 +746,9 @@ def main() -> None:
     LOGGER.info("Saved Phase 1 report to %s", report_path)
     LOGGER.info("Saved Phase 1 HTML report to %s", html_report_path)
 
+    manifest_path = Path(args.output_dir) / "pipeline_manifest.json"
+    report_paths = [report_path, html_report_path]
+    table_paths = collect_table_output_paths(args.output_dir)
     manifest = build_pipeline_manifest(
         start=args.start,
         end=args.end,
@@ -714,8 +760,40 @@ def main() -> None:
         backtest_universe_mode=args.backtest_universe_mode,
         rolling_window=args.rolling_window,
         performance_summary=performance_summary,
+        table_paths=table_paths,
+        report_paths=report_paths,
+        chart_paths=chart_paths,
+        config_paths=config_paths,
+        output_dir=args.output_dir,
+        raw_dir=args.raw_dir,
+        processed_dir=args.processed_dir,
+        figure_dir=args.figure_dir,
+        report_dir=args.report_dir,
+    )
+    write_pipeline_manifest(manifest, args.output_dir)
+    output_inventory = build_output_inventory(
         table_paths=collect_table_output_paths(args.output_dir),
-        report_paths=[report_path, html_report_path],
+        report_paths=report_paths,
+        chart_paths=chart_paths,
+        manifest_path=manifest_path,
+    )
+    inventory_path = write_output_inventory(output_inventory, args.output_dir)
+
+    final_table_paths = collect_table_output_paths(args.output_dir)
+    final_table_paths["output_inventory"] = inventory_path
+    manifest = build_pipeline_manifest(
+        start=args.start,
+        end=args.end,
+        enabled_tickers=tickers,
+        liquid_tickers=liquid_tickers,
+        backtest_tickers=backtest_tickers,
+        strategy_name=strategy_name,
+        template_name=args.template_name,
+        backtest_universe_mode=args.backtest_universe_mode,
+        rolling_window=args.rolling_window,
+        performance_summary=performance_summary,
+        table_paths=final_table_paths,
+        report_paths=report_paths,
         chart_paths=chart_paths,
         config_paths=config_paths,
         output_dir=args.output_dir,
