@@ -19,6 +19,7 @@ def test_argument_parser_exposes_rolling_window_default_and_override() -> None:
     override_args = parser.parse_args(["--start", "2024-01-01", "--rolling-window", "21"])
 
     assert default_args.rolling_window == 63
+    assert default_args.risk_limits_config == "config/risk_limits.yaml"
     assert override_args.rolling_window == 21
 
 

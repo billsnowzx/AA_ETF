@@ -63,6 +63,7 @@ D:\AI\AAETF
 - `config/portfolio_templates.yaml`: strategic template weights with `balanced` as the default
 - `config/benchmark_config.yaml`: benchmark definitions for Phase 1 evaluation
 - `config/rebalance_rules.yaml`: calendar rebalance, drift thresholds, transaction cost, and placeholder overlay settings
+- `config/risk_limits.yaml`: placeholder risk-limit settings; Phase 1 records this in the manifest but does not enforce limits beyond liquidity filtering
 
 ## Data flow
 

@@ -513,6 +513,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--portfolio-config", default="config/portfolio_templates.yaml")
     parser.add_argument("--benchmark-config", default="config/benchmark_config.yaml")
     parser.add_argument("--rebalance-config", default="config/rebalance_rules.yaml")
+    parser.add_argument("--risk-limits-config", default="config/risk_limits.yaml")
     parser.add_argument("--template-name", default=None)
     parser.add_argument("--start", required=True, help="Inclusive start date in YYYY-MM-DD format.")
     parser.add_argument("--end", default=None, help="Exclusive end date in YYYY-MM-DD format.")
@@ -689,6 +690,7 @@ def main() -> None:
             "portfolio_templates": args.portfolio_config,
             "benchmarks": args.benchmark_config,
             "rebalance_rules": args.rebalance_config,
+            "risk_limits": args.risk_limits_config,
         },
         output_dir=args.output_dir,
         raw_dir=args.raw_dir,

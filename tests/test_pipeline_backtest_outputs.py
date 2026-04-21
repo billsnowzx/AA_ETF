@@ -213,6 +213,7 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
             "portfolio_templates": "config/portfolio_templates.yaml",
             "benchmarks": "config/benchmark_config.yaml",
             "rebalance_rules": "config/rebalance_rules.yaml",
+            "risk_limits": "config/risk_limits.yaml",
         },
         output_dir="outputs/tables",
         raw_dir="data/raw",
@@ -231,6 +232,7 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         assert loaded["parameters"]["template_name"] == "balanced"
         assert loaded["parameters"]["backtest_universe_mode"] == "liquidity_filtered"
         assert loaded["config_files"]["universe"] == "config\\etf_universe.yaml"
+        assert loaded["config_files"]["risk_limits"] == "config\\risk_limits.yaml"
         assert loaded["universes"]["backtest_tickers"] == ["VTI", "AGG"]
         assert loaded["strategy"]["ending_nav"] == 1.25
         assert loaded["outputs"]["tables"]["performance_summary"] == "outputs\\tables\\performance_summary.csv"
