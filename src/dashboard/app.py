@@ -35,6 +35,7 @@ def _build_manifest_summary(manifest: dict) -> pd.DataFrame:
     parameters = manifest.get("parameters", {})
     universes = manifest.get("universes", {})
     strategy = manifest.get("strategy", {})
+    config_files = manifest.get("config_files", {})
     rows = {
         "run_completed_at": manifest.get("run_completed_at", "n/a"),
         "date_range": f"{date_range.get('start', 'n/a')} to {date_range.get('end', 'n/a')}",
@@ -46,6 +47,12 @@ def _build_manifest_summary(manifest: dict) -> pd.DataFrame:
         "liquid_tickers": ", ".join(universes.get("liquid_tickers", [])),
         "backtest_tickers": ", ".join(universes.get("backtest_tickers", [])),
     }
+    rows.update(
+        {
+            f"config_{name}": path
+            for name, path in sorted(config_files.items())
+        }
+    )
     return pd.DataFrame.from_dict(rows, orient="index", columns=["value"])
 
 

@@ -65,6 +65,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
                     "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
                     "parameters": {"backtest_universe_mode": "liquidity_filtered", "rolling_window": 63},
                     "strategy": {"name": "balanced", "ending_nav": 1.25},
+                    "config_files": {"universe": "config/etf_universe.yaml"},
                     "universes": {
                         "enabled_tickers": ["VTI", "AGG"],
                         "liquid_tickers": ["AGG", "VTI"],
@@ -88,6 +89,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Latest Rolling Volatility" in html
         assert "Run Manifest" in html
         assert "liquidity_filtered" in html
+        assert "config/etf_universe.yaml" in html
         assert "Data Quality Summary" in html
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
@@ -146,6 +148,7 @@ def test_build_manifest_summary_flattens_key_run_context() -> None:
         "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
         "parameters": {"backtest_universe_mode": "liquidity_filtered", "rolling_window": 63},
         "strategy": {"name": "balanced", "ending_nav": 1.25},
+        "config_files": {"universe": "config/etf_universe.yaml"},
         "universes": {
             "enabled_tickers": ["VTI", "AGG"],
             "liquid_tickers": ["AGG", "VTI"],
@@ -158,6 +161,7 @@ def test_build_manifest_summary_flattens_key_run_context() -> None:
     assert summary.loc["date_range", "value"] == "2024-01-01 to 2024-12-31"
     assert summary.loc["backtest_universe_mode", "value"] == "liquidity_filtered"
     assert summary.loc["backtest_tickers", "value"] == "VTI, AGG"
+    assert summary.loc["config_universe", "value"] == "config/etf_universe.yaml"
 
 
 def test_write_dashboard_html_creates_file() -> None:
