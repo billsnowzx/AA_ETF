@@ -323,3 +323,35 @@ def test_build_and_write_output_inventory_records_existing_outputs() -> None:
         assert manifest_row["output_type"] == "manifest"
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_build_output_inventory_marks_missing_artifacts() -> None:
+    output_dir = Path("data/cache") / f"test_output_inventory_missing_{uuid.uuid4().hex}"
+    existing_table_path = output_dir / "performance_summary.csv"
+    missing_report_path = output_dir / "balanced_phase1_report.md"
+    missing_figure_path = output_dir / "balanced_nav.png"
+    missing_manifest_path = output_dir / "pipeline_manifest.json"
+
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        existing_table_path.write_text("portfolio,ending_nav\nbalanced,1.25\n", encoding="utf-8")
+
+        inventory = build_output_inventory(
+            table_paths={"performance_summary": existing_table_path},
+            report_paths=[missing_report_path],
+            chart_paths={"nav_chart": missing_figure_path},
+            manifest_path=missing_manifest_path,
+        )
+
+        report_row = inventory.loc[inventory["name"] == "balanced_phase1_report"].iloc[0]
+        figure_row = inventory.loc[inventory["name"] == "nav_chart"].iloc[0]
+        manifest_row = inventory.loc[inventory["name"] == "pipeline_manifest"].iloc[0]
+
+        assert bool(report_row["exists"]) is False
+        assert report_row["size_bytes"] == 0
+        assert bool(figure_row["exists"]) is False
+        assert figure_row["size_bytes"] == 0
+        assert bool(manifest_row["exists"]) is False
+        assert manifest_row["size_bytes"] == 0
+    finally:
+        shutil.rmtree(output_dir, ignore_errors=True)
