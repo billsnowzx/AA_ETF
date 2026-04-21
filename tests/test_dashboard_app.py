@@ -63,6 +63,15 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
             {"value": ["2024-01-01", "liquidity_filtered", "config\\risk_limits.yaml"]},
             index=pd.Index(["start", "backtest_universe_mode", "config_risk_limits"]),
         ).to_csv(table_dir / "run_configuration.csv")
+        pd.DataFrame(
+            {
+                "output_type": ["table"],
+                "name": ["performance_summary"],
+                "path": ["outputs\\tables\\performance_summary.csv"],
+                "exists": [True],
+                "size_bytes": [1234],
+            }
+        ).to_csv(table_dir / "output_inventory.csv", index=False)
         (table_dir / "pipeline_manifest.json").write_text(
             json.dumps(
                 {
@@ -95,6 +104,8 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Run Manifest" in html
         assert "Run Configuration" in html
         assert "config\\risk_limits.yaml" in html
+        assert "Output Inventory" in html
+        assert "performance_summary" in html
         assert "liquidity_filtered" in html
         assert "config/etf_universe.yaml" in html
         assert "Data Quality Summary" in html
@@ -124,6 +135,7 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
             "rolling_sharpe": pd.DataFrame({"balanced": [0.5]}),
             "manifest_summary": pd.DataFrame({"value": [1.25]}, index=pd.Index(["ending_nav"])),
             "run_configuration": pd.DataFrame({"value": ["config\\risk_limits.yaml"]}, index=pd.Index(["config_risk_limits"])),
+            "output_inventory": pd.DataFrame({"name": ["performance_summary"], "size_bytes": [1234]}),
             "data_quality_summary": pd.DataFrame({"observations": [2], "missing_volume": [0]}),
             "etf_summary": pd.DataFrame(
                 {
@@ -147,6 +159,7 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["rolling_sharpe"].iloc[0]["balanced"] == "0.5000"
     assert tables["manifest_summary"].loc["ending_nav", "value"] == "1.2500"
     assert tables["run_configuration"].loc["config_risk_limits", "value"] == "config\\risk_limits.yaml"
+    assert tables["output_inventory"].iloc[0]["size_bytes"] == "1234"
     assert tables["data_quality_summary"].iloc[0]["observations"] == "2"
     assert tables["etf_summary"].loc["VTI", "average_dollar_volume"] == "1000000"
 
