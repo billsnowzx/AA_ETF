@@ -1,4 +1,5 @@
 import shutil
+import sys
 import uuid
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from src.dashboard.app import (
     _build_manifest_summary,
     _format_dashboard_tables,
     build_dashboard_html,
+    main,
     open_dashboard_html,
     write_dashboard_html,
 )
@@ -226,3 +228,51 @@ def test_open_dashboard_html_opens_file_url(monkeypatch) -> None:
     assert url.startswith("file:///")
     assert url.endswith("/outputs/reports/dashboard.html")
     assert opened_urls == [url]
+
+
+def test_main_no_server_skips_server_start(monkeypatch) -> None:
+    calls: dict[str, object] = {"wrote": False, "served": False}
+
+    def fake_write_dashboard_html(**kwargs):
+        calls["wrote"] = kwargs
+        return Path(kwargs["output_path"])
+
+    def fake_run_dashboard_server(**kwargs):
+        calls["served"] = True
+
+    monkeypatch.setattr("src.dashboard.app.write_dashboard_html", fake_write_dashboard_html)
+    monkeypatch.setattr("src.dashboard.app.run_dashboard_server", fake_run_dashboard_server)
+    monkeypatch.setattr(sys, "argv", ["app.py", "--no-server", "--dashboard-path", "outputs/reports/test_dashboard.html"])
+
+    main()
+
+    assert calls["wrote"] is not False
+    assert calls["served"] is False
+
+
+def test_main_no_server_with_open_calls_open_helper(monkeypatch) -> None:
+    calls: dict[str, object] = {"open_path": None, "served": False}
+
+    def fake_write_dashboard_html(**kwargs):
+        return Path(kwargs["output_path"])
+
+    def fake_open_dashboard_html(path: str):
+        calls["open_path"] = path
+        return "file:///dummy"
+
+    def fake_run_dashboard_server(**kwargs):
+        calls["served"] = True
+
+    monkeypatch.setattr("src.dashboard.app.write_dashboard_html", fake_write_dashboard_html)
+    monkeypatch.setattr("src.dashboard.app.open_dashboard_html", fake_open_dashboard_html)
+    monkeypatch.setattr("src.dashboard.app.run_dashboard_server", fake_run_dashboard_server)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["app.py", "--no-server", "--open", "--dashboard-path", "outputs/reports/static.html"],
+    )
+
+    main()
+
+    assert calls["open_path"] == "outputs/reports/static.html"
+    assert calls["served"] is False
