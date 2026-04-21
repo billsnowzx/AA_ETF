@@ -9,6 +9,7 @@ from src.dashboard.app import (
     _build_manifest_summary,
     _format_dashboard_tables,
     build_dashboard_html,
+    open_dashboard_html,
     write_dashboard_html,
 )
 
@@ -196,3 +197,19 @@ def test_write_dashboard_html_creates_file() -> None:
         assert "AA ETF Research Dashboard" in result.read_text(encoding="utf-8")
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_open_dashboard_html_opens_file_url(monkeypatch) -> None:
+    opened_urls: list[str] = []
+
+    def fake_open(url: str) -> bool:
+        opened_urls.append(url)
+        return True
+
+    monkeypatch.setattr("src.dashboard.app.webbrowser.open", fake_open)
+
+    url = open_dashboard_html("outputs/reports/dashboard.html")
+
+    assert url.startswith("file:///")
+    assert url.endswith("/outputs/reports/dashboard.html")
+    assert opened_urls == [url]

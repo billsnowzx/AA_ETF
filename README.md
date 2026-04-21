@@ -132,6 +132,12 @@ This command will:
 - start a local server at `http://127.0.0.1:8000/reports/dashboard.html`
 - serve the latest pipeline tables, figures, generated reports, and run manifest through a single local page
 
+For environments where a persistent local server is not needed, generate and open the static dashboard directly:
+
+```bash
+python -m src.dashboard.app --no-server --open
+```
+
 Optional policy:
 
 - `--backtest-universe-mode configured` keeps configured strategy and benchmark assets in the backtest even if some fail the liquidity screen.

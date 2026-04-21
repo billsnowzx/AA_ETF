@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import webbrowser
 from html import escape
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -423,6 +424,13 @@ def write_dashboard_html(
     return destination
 
 
+def open_dashboard_html(output_path: str | Path = "outputs/reports/dashboard.html") -> str:
+    """Open the generated dashboard HTML file and return its file URL."""
+    url = Path(output_path).resolve().as_uri()
+    webbrowser.open(url)
+    return url
+
+
 def run_dashboard_server(
     host: str = "127.0.0.1",
     port: int = 8000,
@@ -448,6 +456,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--figure-dir", default="outputs/figures")
     parser.add_argument("--report-dir", default="outputs/reports")
     parser.add_argument("--dashboard-path", default="outputs/reports/dashboard.html")
+    parser.add_argument("--open", action="store_true", help="Open the generated dashboard in the default browser.")
+    parser.add_argument("--no-server", action="store_true", help="Generate the dashboard and exit without serving HTTP.")
     return parser
 
 
@@ -462,6 +472,10 @@ def main() -> None:
         figure_dir=args.figure_dir,
         report_dir=args.report_dir,
     )
+    if args.open:
+        open_dashboard_html(args.dashboard_path)
+    if args.no_server:
+        return
     run_dashboard_server(host=args.host, port=args.port, directory=Path(args.dashboard_path).parent.parent)
 
 
