@@ -177,6 +177,32 @@ def _format_data_quality_summary(data_quality_summary: pd.DataFrame | None) -> p
     return formatted
 
 
+def build_run_configuration_summary(
+    *,
+    start: str,
+    end: str | None,
+    template_name: str | None,
+    backtest_universe_mode: str,
+    rolling_window: int,
+    config_paths: dict[str, str | Path],
+) -> pd.DataFrame:
+    """Build a compact report table describing run parameters and config inputs."""
+    rows = {
+        "start": start,
+        "end": end,
+        "template_name": template_name if template_name is not None else "default",
+        "backtest_universe_mode": backtest_universe_mode,
+        "rolling_window": rolling_window,
+    }
+    rows.update(
+        {
+            f"config_{name}": str(Path(path))
+            for name, path in sorted(config_paths.items())
+        }
+    )
+    return pd.DataFrame.from_dict(rows, orient="index", columns=["value"])
+
+
 def build_phase1_report_markdown(
     strategy_name: str,
     performance_summary: pd.DataFrame,
@@ -193,6 +219,7 @@ def build_phase1_report_markdown(
     chart_paths: dict[str, Path],
     report_date: str,
     data_quality_summary: pd.DataFrame | None = None,
+    run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
@@ -267,6 +294,7 @@ def build_phase1_report_markdown(
     asset_risk_snapshot = risk_summary_tables["asset_risk_snapshot"]
     rolling_view = _format_rolling_metric_snapshot(rolling_metric_snapshot)
     data_quality_view = _format_data_quality_summary(data_quality_summary)
+    run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
     note_lines = "\n".join(f"- {note}" for note in notes) if notes else "- None"
     figure_lines = "\n".join(f"- `{name}`: `{path.as_posix()}`" for name, path in chart_paths.items())
@@ -288,6 +316,10 @@ Generated: {report_date}
 ## Notes
 
 {note_lines}
+
+## Run Configuration
+
+{dataframe_to_markdown_table(run_config_view) if not run_config_view.empty else "No run configuration generated."}
 
 ## Performance Summary
 
@@ -356,6 +388,7 @@ def build_phase1_report_html(
     chart_paths: dict[str, Path],
     report_date: str,
     data_quality_summary: pd.DataFrame | None = None,
+    run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
@@ -430,6 +463,7 @@ def build_phase1_report_html(
     asset_risk_snapshot = risk_summary_tables["asset_risk_snapshot"]
     rolling_view = _format_rolling_metric_snapshot(rolling_metric_snapshot)
     data_quality_view = _format_data_quality_summary(data_quality_summary)
+    run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
     note_items = "".join(f"<li>{escape(note)}</li>" for note in notes) if notes else "<li>None</li>"
     figure_items = "".join(
@@ -475,6 +509,7 @@ def build_phase1_report_html(
     <ul>{note_items}</ul>
   </section>
 
+  <section><h2>Run Configuration</h2>{dataframe_to_html_table(run_config_view) if not run_config_view.empty else "<p>No run configuration generated.</p>"}</section>
   <section><h2>Performance Summary</h2>{dataframe_to_html_table(performance_view)}</section>
   <section><h2>Turnover Summary</h2>{dataframe_to_html_table(turnover_view)}</section>
   <section><h2>Annual Return Table</h2>{dataframe_to_html_table(annual_view)}</section>
@@ -509,6 +544,7 @@ def write_phase1_report(
     output_path: str | Path,
     report_date: str,
     data_quality_summary: pd.DataFrame | None = None,
+    run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
@@ -532,6 +568,7 @@ def write_phase1_report(
         chart_paths=chart_paths,
         report_date=report_date,
         rolling_metric_snapshot=rolling_metric_snapshot,
+        run_configuration=run_configuration,
         notes=notes,
     )
     output.write_text(report, encoding="utf-8")
@@ -555,6 +592,7 @@ def write_phase1_html_report(
     output_path: str | Path,
     report_date: str,
     data_quality_summary: pd.DataFrame | None = None,
+    run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
@@ -578,6 +616,7 @@ def write_phase1_html_report(
         chart_paths=chart_paths,
         report_date=report_date,
         rolling_metric_snapshot=rolling_metric_snapshot,
+        run_configuration=run_configuration,
         notes=notes,
     )
     output.write_text(report, encoding="utf-8")

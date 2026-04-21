@@ -10,6 +10,7 @@ from src.dashboard.reporting import (
     build_phase1_report_html,
     build_phase1_report_markdown,
     build_phase1_risk_summary_tables,
+    build_run_configuration_summary,
     build_top_correlation_summary,
     write_phase1_html_report,
     write_phase1_report,
@@ -47,6 +48,17 @@ def _sample_data_quality_summary() -> pd.DataFrame:
             "has_duplicate_dates": [False],
         },
         index=pd.Index(["VTI"], name="ticker"),
+    )
+
+
+def _sample_run_configuration() -> pd.DataFrame:
+    return build_run_configuration_summary(
+        start="2024-01-01",
+        end="2024-12-31",
+        template_name=None,
+        backtest_universe_mode="liquidity_filtered",
+        rolling_window=63,
+        config_paths={"universe": "config/etf_universe.yaml"},
     )
 
 
@@ -127,6 +139,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         chart_paths=chart_paths,
         report_date="2026-04-18",
         rolling_metric_snapshot=rolling_metric_snapshot,
+        run_configuration=_sample_run_configuration(),
         notes=["IAGG failed the liquidity filter"],
     )
 
@@ -140,6 +153,8 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "## Benchmark Drawdown Comparisons" in report
     assert "## Latest Rolling Metrics" in report
     assert "## Data Quality Summary" in report
+    assert "## Run Configuration" in report
+    assert "config\\etf_universe.yaml" in report
     assert "missing_volume" in report
     assert "12.00%" in report
 
@@ -214,6 +229,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
         correlation_pairs=correlation_pairs,
         chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
         report_date="2026-04-19",
+        run_configuration=_sample_run_configuration(),
         rolling_metric_snapshot=pd.DataFrame(
             {"balanced": [0.12, 0.8]},
             index=["latest_rolling_volatility", "latest_rolling_sharpe"],
@@ -228,6 +244,8 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "<h2>Benchmark Drawdown Comparisons</h2>" in report
     assert "<h2>Latest Rolling Metrics</h2>" in report
     assert "<h2>Data Quality Summary</h2>" in report
+    assert "<h2>Run Configuration</h2>" in report
+    assert "config\\etf_universe.yaml" in report
     assert "missing_volume" in report
     assert "12.00%" in report
 
@@ -281,6 +299,15 @@ def test_build_latest_rolling_metric_snapshot_uses_latest_non_empty_rows() -> No
 
     assert snapshot.loc["latest_rolling_volatility", "balanced"] == 0.12
     assert snapshot.loc["latest_rolling_sharpe", "balanced"] == 0.8
+
+
+def test_build_run_configuration_summary_contains_parameters_and_configs() -> None:
+    summary = _sample_run_configuration()
+
+    assert summary.loc["template_name", "value"] == "default"
+    assert summary.loc["backtest_universe_mode", "value"] == "liquidity_filtered"
+    assert summary.loc["rolling_window", "value"] == 63
+    assert summary.loc["config_universe", "value"] == "config\\etf_universe.yaml"
 
 
 def test_write_phase1_report_creates_markdown_file() -> None:
@@ -358,6 +385,7 @@ def test_write_phase1_report_creates_markdown_file() -> None:
             chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
             output_path=output_path,
             report_date="2026-04-18",
+            run_configuration=_sample_run_configuration(),
             notes=None,
         )
         assert result.exists()
@@ -441,6 +469,7 @@ def test_write_phase1_html_report_creates_html_file() -> None:
             chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
             output_path=output_path,
             report_date="2026-04-19",
+            run_configuration=_sample_run_configuration(),
             notes=None,
         )
         assert result.exists()

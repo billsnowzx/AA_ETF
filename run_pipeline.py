@@ -25,6 +25,7 @@ from src.dashboard.plots import write_phase1_chart_outputs
 from src.dashboard.reporting import (
     build_latest_rolling_metric_snapshot,
     build_phase1_risk_summary_tables,
+    build_run_configuration_summary,
     write_phase1_html_report,
     write_phase1_report,
 )
@@ -628,6 +629,21 @@ def main() -> None:
             + ", ".join(non_liquid_required_assets)
         )
     report_notes.append(f"Backtest universe mode: {args.backtest_universe_mode}")
+    config_paths = {
+        "universe": args.universe_config,
+        "portfolio_templates": args.portfolio_config,
+        "benchmarks": args.benchmark_config,
+        "rebalance_rules": args.rebalance_config,
+        "risk_limits": args.risk_limits_config,
+    }
+    run_configuration = build_run_configuration_summary(
+        start=args.start,
+        end=args.end,
+        template_name=args.template_name,
+        backtest_universe_mode=args.backtest_universe_mode,
+        rolling_window=args.rolling_window,
+        config_paths=config_paths,
+    )
     report_path = write_phase1_report(
         strategy_name=strategy_name,
         performance_summary=performance_summary,
@@ -646,6 +662,7 @@ def main() -> None:
         output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.md",
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         rolling_metric_snapshot=rolling_metric_snapshot,
+        run_configuration=run_configuration,
         notes=report_notes,
     )
     html_report_path = write_phase1_html_report(
@@ -666,6 +683,7 @@ def main() -> None:
         output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.html",
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         rolling_metric_snapshot=rolling_metric_snapshot,
+        run_configuration=run_configuration,
         notes=report_notes,
     )
     LOGGER.info("Saved Phase 1 report to %s", report_path)
@@ -685,13 +703,7 @@ def main() -> None:
         table_paths=collect_table_output_paths(args.output_dir),
         report_paths=[report_path, html_report_path],
         chart_paths=chart_paths,
-        config_paths={
-            "universe": args.universe_config,
-            "portfolio_templates": args.portfolio_config,
-            "benchmarks": args.benchmark_config,
-            "rebalance_rules": args.rebalance_config,
-            "risk_limits": args.risk_limits_config,
-        },
+        config_paths=config_paths,
         output_dir=args.output_dir,
         raw_dir=args.raw_dir,
         processed_dir=args.processed_dir,
