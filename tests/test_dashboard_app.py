@@ -276,3 +276,37 @@ def test_main_no_server_with_open_calls_open_helper(monkeypatch) -> None:
 
     assert calls["open_path"] == "outputs/reports/static.html"
     assert calls["served"] is False
+
+
+def test_main_default_runs_server_with_dashboard_root(monkeypatch) -> None:
+    calls: dict[str, object] = {"served": None}
+
+    def fake_write_dashboard_html(**kwargs):
+        return Path(kwargs["output_path"])
+
+    def fake_run_dashboard_server(**kwargs):
+        calls["served"] = kwargs
+
+    monkeypatch.setattr("src.dashboard.app.write_dashboard_html", fake_write_dashboard_html)
+    monkeypatch.setattr("src.dashboard.app.run_dashboard_server", fake_run_dashboard_server)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "app.py",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "9001",
+            "--dashboard-path",
+            "outputs/reports/custom_dashboard.html",
+        ],
+    )
+
+    main()
+
+    assert calls["served"] == {
+        "host": "0.0.0.0",
+        "port": 9001,
+        "directory": Path("outputs"),
+    }
