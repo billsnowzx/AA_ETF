@@ -142,6 +142,7 @@ Optional policy:
 
 - `--backtest-universe-mode configured` keeps configured strategy and benchmark assets in the backtest even if some fail the liquidity screen.
 - `--backtest-universe-mode liquidity_filtered` requires every configured backtest asset to pass the liquidity screen and raises an error otherwise.
+- `--fail-on-missing-outputs` raises an error when `output_inventory.csv` detects missing expected artifacts.
 
 Current Phase 1 config note:
 

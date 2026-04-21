@@ -485,6 +485,14 @@ def write_output_inventory(inventory: pd.DataFrame, output_dir: str | Path) -> P
     return inventory_path
 
 
+def find_missing_output_inventory_entries(inventory: pd.DataFrame) -> pd.DataFrame:
+    """Return output inventory rows where expected artifacts are missing."""
+    if inventory.empty or "exists" not in inventory.columns:
+        return pd.DataFrame(columns=inventory.columns)
+    exists_mask = inventory["exists"].astype(bool)
+    return inventory.loc[~exists_mask].reset_index(drop=True)
+
+
 def build_pipeline_manifest(
     *,
     start: str,
@@ -590,6 +598,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
         default="configured",
         choices=["configured", "liquidity_filtered"],
         help="Use the full configured portfolio universe or require all backtest assets to pass the liquidity screen.",
+    )
+    parser.add_argument(
+        "--fail-on-missing-outputs",
+        action="store_true",
+        help="Raise an error when output inventory reports missing artifacts.",
     )
     parser.add_argument("--log-level", default="INFO")
     return parser
@@ -778,6 +791,18 @@ def main() -> None:
         manifest_path=manifest_path,
     )
     inventory_path = write_output_inventory(output_inventory, args.output_dir)
+    missing_outputs = find_missing_output_inventory_entries(output_inventory)
+    if not missing_outputs.empty:
+        missing_labels = ", ".join(
+            f"{row.output_type}:{row.name}"
+            for row in missing_outputs.itertuples(index=False)
+        )
+        if args.fail_on_missing_outputs:
+            raise RuntimeError(
+                "Output inventory validation failed; missing artifacts: "
+                + missing_labels
+            )
+        LOGGER.warning("Output inventory found missing artifacts: %s", missing_labels)
 
     final_table_paths = collect_table_output_paths(args.output_dir)
     final_table_paths["output_inventory"] = inventory_path

@@ -10,6 +10,7 @@ from run_pipeline import (
     build_asset_return_matrix,
     build_nav_table,
     build_backtest_policy_tables,
+    find_missing_output_inventory_entries,
     build_output_inventory,
     build_performance_summary,
     build_pipeline_manifest,
@@ -355,3 +356,19 @@ def test_build_output_inventory_marks_missing_artifacts() -> None:
         assert manifest_row["size_bytes"] == 0
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_find_missing_output_inventory_entries_returns_only_missing_rows() -> None:
+    inventory = pd.DataFrame(
+        [
+            {"output_type": "table", "name": "performance_summary", "path": "a.csv", "exists": True, "size_bytes": 10},
+            {"output_type": "report", "name": "balanced_phase1_report", "path": "b.md", "exists": False, "size_bytes": 0},
+            {"output_type": "figure", "name": "nav_chart", "path": "c.png", "exists": False, "size_bytes": 0},
+        ]
+    )
+
+    missing = find_missing_output_inventory_entries(inventory)
+
+    assert len(missing) == 2
+    assert missing["name"].tolist() == ["balanced_phase1_report", "nav_chart"]
+    assert missing["size_bytes"].tolist() == [0, 0]
