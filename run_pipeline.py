@@ -418,6 +418,19 @@ def write_rolling_metric_outputs(
     LOGGER.info("Saved drawdown series to %s", output_path / "drawdown_series.csv")
 
 
+def write_run_configuration_output(
+    run_configuration: pd.DataFrame,
+    output_dir: str | Path,
+) -> Path:
+    """Persist run parameters and config inputs as an auditable CSV table."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    config_path = output_path / "run_configuration.csv"
+    run_configuration.to_csv(config_path, index=True)
+    LOGGER.info("Saved run configuration to %s", config_path)
+    return config_path
+
+
 def collect_table_output_paths(output_dir: str | Path) -> dict[str, Path]:
     """Collect generated table output files for the pipeline manifest."""
     output_path = Path(output_dir)
@@ -644,6 +657,7 @@ def main() -> None:
         rolling_window=args.rolling_window,
         config_paths=config_paths,
     )
+    write_run_configuration_output(run_configuration, args.output_dir)
     report_path = write_phase1_report(
         strategy_name=strategy_name,
         performance_summary=performance_summary,

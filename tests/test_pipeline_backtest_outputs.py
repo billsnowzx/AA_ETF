@@ -22,6 +22,7 @@ from run_pipeline import (
     run_strategy_backtests,
     write_backtest_outputs,
     write_pipeline_manifest,
+    write_run_configuration_output,
     write_rolling_metric_outputs,
 )
 
@@ -251,5 +252,30 @@ def test_collect_table_output_paths_returns_csv_outputs_by_stem() -> None:
         paths = collect_table_output_paths(output_dir)
 
         assert paths == {"performance_summary": output_dir / "performance_summary.csv"}
+    finally:
+        shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_write_run_configuration_output_creates_auditable_csv() -> None:
+    output_dir = Path("data/cache") / f"test_run_config_{uuid.uuid4().hex}"
+    run_configuration = pd.DataFrame.from_dict(
+        {
+            "start": "2024-01-01",
+            "end": "2024-12-31",
+            "config_universe": "config\\etf_universe.yaml",
+        },
+        orient="index",
+        columns=["value"],
+    )
+
+    try:
+        output_path = write_run_configuration_output(run_configuration, output_dir)
+        loaded = pd.read_csv(output_path, index_col=0)
+        table_paths = collect_table_output_paths(output_dir)
+
+        assert output_path == output_dir / "run_configuration.csv"
+        assert loaded.loc["start", "value"] == "2024-01-01"
+        assert loaded.loc["config_universe", "value"] == "config\\etf_universe.yaml"
+        assert table_paths["run_configuration"] == output_path
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
