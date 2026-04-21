@@ -208,7 +208,10 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         backtest_universe_mode="liquidity_filtered",
         rolling_window=21,
         performance_summary=performance_summary,
-        table_paths={"performance_summary": Path("outputs/tables/performance_summary.csv")},
+        table_paths={
+            "performance_summary": Path("outputs/tables/performance_summary.csv"),
+            "output_inventory": Path("outputs/tables/output_inventory.csv"),
+        },
         report_paths=[Path("outputs/reports/balanced_phase1_report.md")],
         chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
         config_paths={
@@ -239,6 +242,7 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         assert loaded["universes"]["backtest_tickers"] == ["VTI", "AGG"]
         assert loaded["strategy"]["ending_nav"] == 1.25
         assert loaded["outputs"]["tables"]["performance_summary"] == "outputs\\tables\\performance_summary.csv"
+        assert loaded["outputs"]["tables"]["output_inventory"] == "outputs\\tables\\output_inventory.csv"
         assert loaded["outputs"]["figures"]["nav_chart"] == "outputs\\figures\\balanced_nav.png"
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
