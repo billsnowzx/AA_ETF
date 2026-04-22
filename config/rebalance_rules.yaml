@@ -1,5 +1,6 @@
 standard_rebalance:
   frequency: quarterly
+  trigger_mode: calendar
 
 weight_drift_rule:
   enabled: true

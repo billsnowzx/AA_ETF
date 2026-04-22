@@ -66,6 +66,7 @@ def test_run_fixed_weight_backtest_applies_rebalance_costs_and_turnover() -> Non
     rebalance_flags = result["rebalance_flags"]
 
     assert rebalance_flags.tolist() == [True, True]
+    assert result["rebalance_reasons"].tolist() == ["initial", "calendar"]
     assert math.isclose(turnover.iloc[0], 1.0, rel_tol=1e-9)
     assert math.isclose(turnover.iloc[1], 0.04761904761904767, rel_tol=1e-9)
 
@@ -195,3 +196,27 @@ def test_run_fixed_weight_backtest_trend_filter_requires_adj_close_data() -> Non
         assert "adjusted-close data" in str(exc)
     else:
         raise AssertionError("Expected ValueError when trend filter is enabled without adjusted-close data.")
+
+
+def test_run_fixed_weight_backtest_drift_only_mode_triggers_on_threshold_breach() -> None:
+    index = pd.to_datetime(["2024-01-02", "2024-01-03"])
+    asset_returns = pd.DataFrame(
+        {
+            "VTI": [1.0, 0.0],
+            "AGG": [0.0, 0.0],
+        },
+        index=index,
+    )
+
+    result = run_fixed_weight_backtest(
+        asset_returns,
+        {"VTI": 0.5, "AGG": 0.5},
+        rebalance_frequency="quarterly",
+        one_way_bps=0.0,
+        rebalance_trigger_mode="drift_only",
+        drift_threshold=0.20,
+        drift_rule_enabled=True,
+    )
+
+    assert result["rebalance_flags"].tolist() == [True, True]
+    assert result["rebalance_reasons"].tolist() == ["initial", "drift"]

@@ -36,6 +36,11 @@ from src.portfolio.policy import (
 )
 from src.portfolio.rebalancer import load_standard_rebalance_frequency
 from src.portfolio.rebalancer import load_trend_filter_settings
+from src.portfolio.rebalancer import (
+    load_rebalance_trigger_mode,
+    load_drift_rule_enabled,
+    load_relative_drift_threshold,
+)
 from src.portfolio.transaction_cost import load_one_way_transaction_cost_bps
 from src.portfolio.weights import load_portfolio_template
 from src.universe.etf_scoring import score_etf_universe
@@ -192,6 +197,11 @@ def run_strategy_backtests(
     benchmark_weights = load_benchmarks(benchmark_config)
     rebalance_frequency = load_standard_rebalance_frequency(rebalance_config)
     one_way_bps = load_one_way_transaction_cost_bps(rebalance_config)
+    rebalance_trigger_mode = load_rebalance_trigger_mode(rebalance_config)
+    drift_rule_enabled = load_drift_rule_enabled(rebalance_config)
+    drift_threshold = 0.20
+    if drift_rule_enabled:
+        drift_threshold = load_relative_drift_threshold(rebalance_config)
 
     benchmark_results: dict[str, dict[str, pd.Series | pd.DataFrame]] = {}
     benchmark_return_series: dict[str, pd.Series] = {}
@@ -202,6 +212,9 @@ def run_strategy_backtests(
             config["weights"],
             rebalance_frequency=rebalance_frequency,
             one_way_bps=one_way_bps,
+            rebalance_trigger_mode=rebalance_trigger_mode,
+            drift_threshold=drift_threshold,
+            drift_rule_enabled=drift_rule_enabled,
         )
         benchmark_results[benchmark_name] = result
         benchmark_return_series[benchmark_name] = result["portfolio_returns"]
@@ -214,6 +227,9 @@ def run_strategy_backtests(
         benchmark_returns=benchmark_return_series,
         adj_close=adj_close,
         trend_filter=trend_filter_settings,
+        rebalance_trigger_mode=rebalance_trigger_mode,
+        drift_threshold=drift_threshold,
+        drift_rule_enabled=drift_rule_enabled,
     )
     return strategy_name, strategy_result, benchmark_results
 
@@ -418,6 +434,12 @@ def write_backtest_outputs(
     nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
+    rebalance_reason_table = pd.DataFrame(
+        {
+            strategy_name: strategy_result["rebalance_reasons"],
+            **{name: result["rebalance_reasons"] for name, result in benchmark_results.items()},
+        }
+    )
 
     performance_summary.to_csv(output_path / "performance_summary.csv", index=True)
     turnover_summary.to_csv(output_path / "turnover_summary.csv", index=True)
@@ -428,6 +450,7 @@ def write_backtest_outputs(
     trend_filter_summary.to_csv(output_path / "trend_filter_summary.csv", index=True)
     nav_table.to_csv(output_path / "nav_series.csv", index=True)
     return_table.to_csv(output_path / "return_series.csv", index=True)
+    rebalance_reason_table.to_csv(output_path / "rebalance_reason.csv", index=True)
     policy_validation.to_csv(output_path / "backtest_universe_validation.csv", index=True)
     policy_summary.to_csv(output_path / "backtest_universe_policy_summary.csv", index=True)
     risk_outputs["covariance_matrix"].to_csv(output_path / "covariance_matrix.csv", index=True)
@@ -448,6 +471,7 @@ def write_backtest_outputs(
     LOGGER.info("Saved benchmark annual excess returns to %s", output_path / "benchmark_annual_excess_returns.csv")
     LOGGER.info("Saved benchmark drawdown comparisons to %s", output_path / "benchmark_drawdown_comparisons.csv")
     LOGGER.info("Saved trend filter summary to %s", output_path / "trend_filter_summary.csv")
+    LOGGER.info("Saved rebalance reasons to %s", output_path / "rebalance_reason.csv")
     LOGGER.info("Saved covariance matrix to %s", output_path / "covariance_matrix.csv")
     LOGGER.info("Saved correlation matrix to %s", output_path / "correlation_matrix.csv")
     LOGGER.info("Saved top correlation pairs to %s", output_path / "top_correlation_pairs.csv")

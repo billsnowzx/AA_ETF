@@ -29,6 +29,24 @@ def load_standard_rebalance_frequency(config_path: str | Path) -> str:
     return str(frequency)
 
 
+def load_rebalance_trigger_mode(config_path: str | Path) -> str:
+    """Load rebalance trigger mode from config."""
+    config = load_rebalance_rules(config_path)
+    mode = str(config["standard_rebalance"].get("trigger_mode", "calendar")).lower()
+    supported_modes = {"calendar", "drift_only", "calendar_or_drift"}
+    if mode not in supported_modes:
+        raise ValueError(
+            f"Unsupported standard_rebalance.trigger_mode '{mode}'. Supported values: {sorted(supported_modes)}."
+        )
+    return mode
+
+
+def load_drift_rule_enabled(config_path: str | Path) -> bool:
+    """Load whether drift-based rebalance checks are enabled."""
+    config = load_rebalance_rules(config_path)
+    return bool(config["weight_drift_rule"].get("enabled", False))
+
+
 def load_relative_drift_threshold(config_path: str | Path) -> float:
     """Load the configured relative drift threshold."""
     config = load_rebalance_rules(config_path)

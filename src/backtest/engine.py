@@ -13,6 +13,7 @@ from src.analytics.attribution import (
     benchmark_drawdown_comparison,
 )
 from src.analytics.risk import risk_summary
+from src.portfolio.rebalancer import should_rebalance_by_drift
 from src.portfolio.saa import align_weights_to_returns
 from src.portfolio.transaction_cost import transaction_cost_drag, turnover_traded_weight
 
@@ -164,6 +165,9 @@ def run_fixed_weight_backtest(
     periods_per_year: int = 252,
     adj_close: pd.DataFrame | None = None,
     trend_filter: Mapping[str, object] | None = None,
+    rebalance_trigger_mode: str = "calendar",
+    drift_threshold: float = 0.20,
+    drift_rule_enabled: bool = True,
 ) -> dict[str, pd.Series | pd.DataFrame]:
     """Run a simple fixed-weight portfolio backtest with explicit turnover and costs."""
     if asset_returns.empty:
@@ -172,6 +176,13 @@ def run_fixed_weight_backtest(
     asset_returns = asset_returns.sort_index()
     aligned_target = align_weights_to_returns(asset_returns, target_weights)
     rebalance_dates = set(calendar_rebalance_dates(asset_returns.index, frequency=rebalance_frequency))
+    trigger_mode = rebalance_trigger_mode.lower()
+    supported_trigger_modes = {"calendar", "drift_only", "calendar_or_drift"}
+    if trigger_mode not in supported_trigger_modes:
+        raise ValueError(
+            f"Unsupported rebalance trigger mode '{rebalance_trigger_mode}'. "
+            f"Supported values: {sorted(supported_trigger_modes)}."
+        )
     trend_scale_table = pd.DataFrame(1.0, index=asset_returns.index, columns=asset_returns.columns, dtype=float)
     trend_active_flags = pd.Series(False, index=asset_returns.index, name="trend_filter_active")
     if trend_filter and bool(trend_filter.get("enabled", False)):
@@ -202,25 +213,54 @@ def run_fixed_weight_backtest(
     turnover_history: list[float] = []
     nav_history: list[float] = []
     rebalance_flags: list[bool] = []
+    rebalance_reasons: list[str] = []
     start_weights_history: list[pd.Series] = []
     end_weights_history: list[pd.Series] = []
 
+    first_date = asset_returns.index.min()
     for date, row in asset_returns.iterrows():
-        rebalance_flag = date in rebalance_dates
+        calendar_flag = date in rebalance_dates
+        desired_target = apply_trend_scale_to_target_weights(
+            aligned_target,
+            trend_scale_table.loc[date],
+        )
+        drift_flag = False
+        if drift_rule_enabled:
+            drift_flag = should_rebalance_by_drift(
+                target_weights=desired_target,
+                current_weights=current_weights,
+                relative_deviation_threshold=drift_threshold,
+            )
+
+        if date == first_date:
+            rebalance_flag = True
+            rebalance_reason = "initial"
+        elif trigger_mode == "calendar":
+            rebalance_flag = calendar_flag
+            rebalance_reason = "calendar" if rebalance_flag else "none"
+        elif trigger_mode == "drift_only":
+            rebalance_flag = drift_flag
+            rebalance_reason = "drift" if rebalance_flag else "none"
+        else:
+            rebalance_flag = calendar_flag or drift_flag
+            if rebalance_flag and calendar_flag and drift_flag:
+                rebalance_reason = "calendar_and_drift"
+            elif rebalance_flag and calendar_flag:
+                rebalance_reason = "calendar"
+            elif rebalance_flag and drift_flag:
+                rebalance_reason = "drift"
+            else:
+                rebalance_reason = "none"
         weights_before_return = current_weights.copy()
 
         if rebalance_flag:
-            effective_target = apply_trend_scale_to_target_weights(
-                aligned_target,
-                trend_scale_table.loc[date],
-            )
-            turnover = turnover_traded_weight(effective_target, weights_before_return)
+            turnover = turnover_traded_weight(desired_target, weights_before_return)
             cost_drag = transaction_cost_drag(
-                effective_target,
+                desired_target,
                 current_weights=weights_before_return,
                 one_way_bps=one_way_bps,
             )
-            weights_before_return = effective_target.copy()
+            weights_before_return = desired_target.copy()
         else:
             turnover = 0.0
             cost_drag = 0.0
@@ -235,6 +275,7 @@ def run_fixed_weight_backtest(
         turnover_history.append(turnover)
         nav_history.append(nav)
         rebalance_flags.append(rebalance_flag)
+        rebalance_reasons.append(rebalance_reason)
         start_weights_history.append(weights_before_return.copy())
 
         end_values = weights_before_return * (1.0 + row)
@@ -256,6 +297,7 @@ def run_fixed_weight_backtest(
     turnover_series = pd.Series(turnover_history, index=asset_returns.index, name="turnover_traded_weight")
     nav_series = pd.Series(nav_history, index=asset_returns.index, name="portfolio_nav")
     rebalance_flag_series = pd.Series(rebalance_flags, index=asset_returns.index, name="rebalance_flag")
+    rebalance_reason_series = pd.Series(rebalance_reasons, index=asset_returns.index, name="rebalance_reason")
     weights_start = pd.DataFrame(start_weights_history, index=asset_returns.index)
     weights_end = pd.DataFrame(end_weights_history, index=asset_returns.index)
 
@@ -268,6 +310,7 @@ def run_fixed_weight_backtest(
         "rebalance_flags": rebalance_flag_series,
         "weights_start": weights_start,
         "weights_end": weights_end,
+        "rebalance_reasons": rebalance_reason_series,
         "trend_filter_scales": trend_scale_table,
         "trend_filter_active": trend_active_flags,
         "summary": risk_summary(portfolio_returns, periods_per_year=periods_per_year),
