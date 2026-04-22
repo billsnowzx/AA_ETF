@@ -9,6 +9,7 @@ import pandas as pd
 from run_pipeline import (
     build_asset_return_matrix,
     build_nav_table,
+    build_trend_filter_summary,
     build_trend_filter_overlay_settings,
     build_backtest_policy_tables,
     find_missing_output_inventory_entries,
@@ -143,6 +144,28 @@ def test_build_trend_filter_overlay_settings_enabled_uses_equity_and_reit_assets
         rebalance_config_path.unlink(missing_ok=True)
 
 
+def test_build_trend_filter_summary_counts_active_days_and_reduced_assets() -> None:
+    index = pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"])
+    strategy_result = {
+        "trend_filter_active": pd.Series([False, True, True], index=index, name="trend_filter_active"),
+        "trend_filter_scales": pd.DataFrame(
+            {
+                "VTI": [1.0, 0.5, 0.5],
+                "AGG": [1.0, 1.0, 1.0],
+            },
+            index=index,
+        ),
+    }
+
+    summary = build_trend_filter_summary("balanced", strategy_result)
+
+    assert int(summary.loc["balanced", "observations"]) == 3
+    assert int(summary.loc["balanced", "trend_active_days"]) == 2
+    assert math.isclose(float(summary.loc["balanced", "trend_active_ratio"]), 2.0 / 3.0, rel_tol=1e-9)
+    assert math.isclose(float(summary.loc["balanced", "avg_reduced_assets"]), 2.0 / 3.0, rel_tol=1e-9)
+    assert int(summary.loc["balanced", "max_reduced_assets"]) == 1
+
+
 def test_resolve_backtest_tickers_configured_mode_keeps_required_assets() -> None:
     tickers = resolve_backtest_tickers(
         required_tickers=["VTI", "IAGG"],
@@ -229,6 +252,7 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert (output_dir / "correlation_pairs.csv").exists()
         assert (output_dir / "top_correlation_pairs.csv").exists()
         assert (output_dir / "asset_risk_snapshot.csv").exists()
+        assert (output_dir / "trend_filter_summary.csv").exists()
         assert (output_dir / "trend_filter_active.csv").exists()
         assert (output_dir / "trend_filter_scales.csv").exists()
         assert (output_dir / "rolling_volatility.csv").exists()

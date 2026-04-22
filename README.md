@@ -110,6 +110,7 @@ This command will:
 - run the default strategic portfolio plus configured benchmarks
 - generate `performance_summary.csv`, `annual_return_table.csv`, `turnover_summary.csv`, `benchmark_comparisons.csv`, `nav_series.csv`, and `return_series.csv`
 - generate `benchmark_annual_excess_returns.csv` and `benchmark_drawdown_comparisons.csv`
+- generate `trend_filter_summary.csv`, `trend_filter_active.csv`, and `trend_filter_scales.csv`
 - generate `rolling_volatility.csv`, `rolling_sharpe.csv`, and `drawdown_series.csv`
 - generate `covariance_matrix.csv`, `correlation_matrix.csv`, `covariance_pairs.csv`, and `correlation_pairs.csv`
 - generate `top_correlation_pairs.csv` and `asset_risk_snapshot.csv`

@@ -320,6 +320,62 @@ def build_turnover_summary(
     return pd.DataFrame(rows).set_index("portfolio")
 
 
+def build_trend_filter_summary(
+    strategy_name: str,
+    strategy_result: dict[str, pd.Series | pd.DataFrame],
+) -> pd.DataFrame:
+    """Build a compact summary table for trend-filter activity."""
+    trend_active = strategy_result.get("trend_filter_active")
+    trend_scales = strategy_result.get("trend_filter_scales")
+
+    if not isinstance(trend_active, pd.Series) or trend_active.empty:
+        return pd.DataFrame(
+            [
+                {
+                    "portfolio": strategy_name,
+                    "observations": 0,
+                    "trend_active_days": 0,
+                    "trend_active_ratio": 0.0,
+                    "avg_reduced_assets": 0.0,
+                    "max_reduced_assets": 0,
+                    "first_active_date": None,
+                    "last_active_date": None,
+                }
+            ]
+        ).set_index("portfolio")
+
+    active_mask = trend_active.astype(bool)
+    observations = int(len(active_mask))
+    trend_active_days = int(active_mask.sum())
+    trend_active_ratio = float(trend_active_days / observations) if observations > 0 else 0.0
+
+    avg_reduced_assets = 0.0
+    max_reduced_assets = 0
+    if isinstance(trend_scales, pd.DataFrame) and not trend_scales.empty:
+        reduced_counts = trend_scales.lt(1.0).sum(axis=1)
+        avg_reduced_assets = float(reduced_counts.mean())
+        max_reduced_assets = int(reduced_counts.max())
+
+    active_dates = trend_active.index[active_mask]
+    first_active_date = active_dates.min() if len(active_dates) > 0 else None
+    last_active_date = active_dates.max() if len(active_dates) > 0 else None
+
+    return pd.DataFrame(
+        [
+            {
+                "portfolio": strategy_name,
+                "observations": observations,
+                "trend_active_days": trend_active_days,
+                "trend_active_ratio": trend_active_ratio,
+                "avg_reduced_assets": avg_reduced_assets,
+                "max_reduced_assets": max_reduced_assets,
+                "first_active_date": first_active_date,
+                "last_active_date": last_active_date,
+            }
+        ]
+    ).set_index("portfolio")
+
+
 def build_risk_matrix_outputs(asset_returns: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Build covariance and correlation outputs in matrix and long-table forms."""
     covariance = covariance_matrix(asset_returns)
@@ -358,6 +414,7 @@ def write_backtest_outputs(
     benchmark_comparisons = strategy_result["benchmark_comparisons"]
     benchmark_annual_excess_returns = strategy_result["benchmark_annual_excess_returns"]
     benchmark_drawdown_comparisons = strategy_result["benchmark_drawdown_comparisons"]
+    trend_filter_summary = build_trend_filter_summary(strategy_name, strategy_result)
     nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
@@ -368,6 +425,7 @@ def write_backtest_outputs(
     benchmark_comparisons.to_csv(output_path / "benchmark_comparisons.csv", index=True)
     benchmark_annual_excess_returns.to_csv(output_path / "benchmark_annual_excess_returns.csv", index=True)
     benchmark_drawdown_comparisons.to_csv(output_path / "benchmark_drawdown_comparisons.csv", index=True)
+    trend_filter_summary.to_csv(output_path / "trend_filter_summary.csv", index=True)
     nav_table.to_csv(output_path / "nav_series.csv", index=True)
     return_table.to_csv(output_path / "return_series.csv", index=True)
     policy_validation.to_csv(output_path / "backtest_universe_validation.csv", index=True)
@@ -389,6 +447,7 @@ def write_backtest_outputs(
     LOGGER.info("Saved benchmark comparisons to %s", output_path / "benchmark_comparisons.csv")
     LOGGER.info("Saved benchmark annual excess returns to %s", output_path / "benchmark_annual_excess_returns.csv")
     LOGGER.info("Saved benchmark drawdown comparisons to %s", output_path / "benchmark_drawdown_comparisons.csv")
+    LOGGER.info("Saved trend filter summary to %s", output_path / "trend_filter_summary.csv")
     LOGGER.info("Saved covariance matrix to %s", output_path / "covariance_matrix.csv")
     LOGGER.info("Saved correlation matrix to %s", output_path / "correlation_matrix.csv")
     LOGGER.info("Saved top correlation pairs to %s", output_path / "top_correlation_pairs.csv")
