@@ -23,6 +23,7 @@ from src.data.clean_data import batch_clean_price_frames, build_data_quality_sum
 from src.data.fetch_prices import fetch_prices
 from src.dashboard.plots import write_phase1_chart_outputs
 from src.dashboard.reporting import (
+    build_rebalance_reason_summary,
     build_latest_rolling_metric_snapshot,
     build_phase1_risk_summary_tables,
     build_run_configuration_summary,
@@ -459,6 +460,7 @@ def write_backtest_outputs(
     benchmark_drawdown_comparisons = strategy_result["benchmark_drawdown_comparisons"]
     trend_filter_summary = build_trend_filter_summary(strategy_name, strategy_result)
     rebalance_reason_table = build_rebalance_reason_table(strategy_name, strategy_result, benchmark_results)
+    rebalance_reason_summary = build_rebalance_reason_summary(rebalance_reason_table)
     nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
@@ -473,6 +475,7 @@ def write_backtest_outputs(
     nav_table.to_csv(output_path / "nav_series.csv", index=True)
     return_table.to_csv(output_path / "return_series.csv", index=True)
     rebalance_reason_table.to_csv(output_path / "rebalance_reason.csv", index=True)
+    rebalance_reason_summary.to_csv(output_path / "rebalance_reason_summary.csv", index=True)
     policy_validation.to_csv(output_path / "backtest_universe_validation.csv", index=True)
     policy_summary.to_csv(output_path / "backtest_universe_policy_summary.csv", index=True)
     risk_outputs["covariance_matrix"].to_csv(output_path / "covariance_matrix.csv", index=True)
@@ -494,6 +497,7 @@ def write_backtest_outputs(
     LOGGER.info("Saved benchmark drawdown comparisons to %s", output_path / "benchmark_drawdown_comparisons.csv")
     LOGGER.info("Saved trend filter summary to %s", output_path / "trend_filter_summary.csv")
     LOGGER.info("Saved rebalance reasons to %s", output_path / "rebalance_reason.csv")
+    LOGGER.info("Saved rebalance reason summary to %s", output_path / "rebalance_reason_summary.csv")
     LOGGER.info("Saved covariance matrix to %s", output_path / "covariance_matrix.csv")
     LOGGER.info("Saved correlation matrix to %s", output_path / "correlation_matrix.csv")
     LOGGER.info("Saved top correlation pairs to %s", output_path / "top_correlation_pairs.csv")

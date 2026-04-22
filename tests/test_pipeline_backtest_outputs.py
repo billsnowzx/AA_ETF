@@ -249,6 +249,7 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert (output_dir / "nav_series.csv").exists()
         assert (output_dir / "backtest_universe_validation.csv").exists()
         assert (output_dir / "rebalance_reason.csv").exists()
+        assert (output_dir / "rebalance_reason_summary.csv").exists()
         assert (output_dir / "covariance_matrix.csv").exists()
         assert (output_dir / "correlation_pairs.csv").exists()
         assert (output_dir / "top_correlation_pairs.csv").exists()
