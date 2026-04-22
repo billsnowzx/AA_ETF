@@ -149,6 +149,16 @@ def _format_dashboard_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.Da
             if column in frame.columns:
                 frame[column] = frame[column].map(_format_integer)
 
+    if "trend_filter_summary" in formatted:
+        frame = formatted["trend_filter_summary"]
+        for column in ["observations", "trend_active_days", "max_reduced_assets"]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_integer)
+        if "trend_active_ratio" in frame.columns:
+            frame["trend_active_ratio"] = frame["trend_active_ratio"].map(_format_percent)
+        if "avg_reduced_assets" in frame.columns:
+            frame["avg_reduced_assets"] = frame["avg_reduced_assets"].map(_format_decimal)
+
     if "rolling_volatility" in formatted:
         frame = formatted["rolling_volatility"]
         for column in frame.columns:
@@ -209,6 +219,7 @@ def build_dashboard_html(
     asset_risk_snapshot = _read_csv_if_exists(output_path / "asset_risk_snapshot.csv")
     etf_summary = _read_csv_if_exists(output_path / "etf_summary.csv")
     data_quality_summary = _read_csv_if_exists(output_path / "data_quality_summary.csv")
+    trend_filter_summary = _read_csv_if_exists(output_path / "trend_filter_summary.csv")
     run_configuration = _read_csv_if_exists(output_path / "run_configuration.csv")
     output_inventory = _read_csv_if_exists(output_path / "output_inventory.csv", index_col=None)
     rolling_volatility = _read_csv_if_exists(output_path / "rolling_volatility.csv")
@@ -224,6 +235,7 @@ def build_dashboard_html(
             "asset_risk_snapshot": asset_risk_snapshot,
             "etf_summary": etf_summary,
             "data_quality_summary": data_quality_summary,
+            "trend_filter_summary": trend_filter_summary,
             "run_configuration": run_configuration,
             "output_inventory": output_inventory,
             "rolling_volatility": rolling_volatility.tail(5),
@@ -239,6 +251,7 @@ def build_dashboard_html(
     asset_risk_snapshot = formatted_tables["asset_risk_snapshot"]
     etf_summary = formatted_tables["etf_summary"]
     data_quality_summary = formatted_tables["data_quality_summary"]
+    trend_filter_summary = formatted_tables["trend_filter_summary"]
     run_configuration = formatted_tables["run_configuration"]
     output_inventory = formatted_tables["output_inventory"]
     rolling_volatility = formatted_tables["rolling_volatility"]
@@ -402,6 +415,10 @@ def build_dashboard_html(
       <section class="card">
         <h2>Data Quality Summary</h2>
         {dataframe_to_html_table(data_quality_summary)}
+      </section>
+      <section class="card">
+        <h2>Trend Filter Summary</h2>
+        {dataframe_to_html_table(trend_filter_summary)}
       </section>
       <section class="card">
         <h2>Latest Rolling Volatility</h2>

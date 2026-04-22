@@ -219,6 +219,7 @@ def build_phase1_report_markdown(
     chart_paths: dict[str, Path],
     report_date: str,
     data_quality_summary: pd.DataFrame | None = None,
+    trend_filter_summary: pd.DataFrame | None = None,
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     notes: list[str] | None = None,
@@ -294,6 +295,7 @@ def build_phase1_report_markdown(
     asset_risk_snapshot = risk_summary_tables["asset_risk_snapshot"]
     rolling_view = _format_rolling_metric_snapshot(rolling_metric_snapshot)
     data_quality_view = _format_data_quality_summary(data_quality_summary)
+    trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
     note_lines = "\n".join(f"- {note}" for note in notes) if notes else "- None"
@@ -349,6 +351,10 @@ Generated: {report_date}
 
 {dataframe_to_markdown_table(rolling_view) if not rolling_view.empty else "No rolling metrics generated."}
 
+## Trend Filter Summary
+
+{dataframe_to_markdown_table(trend_view) if not trend_view.empty else "No trend filter summary generated."}
+
 ## ETF Summary
 
 {dataframe_to_markdown_table(etf_view)}
@@ -388,6 +394,7 @@ def build_phase1_report_html(
     chart_paths: dict[str, Path],
     report_date: str,
     data_quality_summary: pd.DataFrame | None = None,
+    trend_filter_summary: pd.DataFrame | None = None,
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     notes: list[str] | None = None,
@@ -463,6 +470,7 @@ def build_phase1_report_html(
     asset_risk_snapshot = risk_summary_tables["asset_risk_snapshot"]
     rolling_view = _format_rolling_metric_snapshot(rolling_metric_snapshot)
     data_quality_view = _format_data_quality_summary(data_quality_summary)
+    trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
     note_items = "".join(f"<li>{escape(note)}</li>" for note in notes) if notes else "<li>None</li>"
@@ -517,6 +525,7 @@ def build_phase1_report_html(
   <section><h2>Benchmark Annual Excess Returns</h2>{dataframe_to_html_table(excess_view) if not excess_view.empty else "<p>No benchmark annual excess returns generated.</p>"}</section>
   <section><h2>Benchmark Drawdown Comparisons</h2>{dataframe_to_html_table(drawdown_view) if not drawdown_view.empty else "<p>No benchmark drawdown comparisons generated.</p>"}</section>
   <section><h2>Latest Rolling Metrics</h2>{dataframe_to_html_table(rolling_view) if not rolling_view.empty else "<p>No rolling metrics generated.</p>"}</section>
+  <section><h2>Trend Filter Summary</h2>{dataframe_to_html_table(trend_view) if not trend_view.empty else "<p>No trend filter summary generated.</p>"}</section>
   <section><h2>ETF Summary</h2>{dataframe_to_html_table(etf_view)}</section>
   <section><h2>Data Quality Summary</h2>{dataframe_to_html_table(data_quality_view) if not data_quality_view.empty else "<p>No data quality summary generated.</p>"}</section>
   <section><h2>Correlation Highlights</h2>{dataframe_to_html_table(correlation_summary) if not correlation_summary.empty else "<p>No non-diagonal correlation pairs available.</p>"}</section>
@@ -544,6 +553,7 @@ def write_phase1_report(
     output_path: str | Path,
     report_date: str,
     data_quality_summary: pd.DataFrame | None = None,
+    trend_filter_summary: pd.DataFrame | None = None,
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     notes: list[str] | None = None,
@@ -567,6 +577,7 @@ def write_phase1_report(
         correlation_pairs=correlation_pairs,
         chart_paths=chart_paths,
         report_date=report_date,
+        trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         run_configuration=run_configuration,
         notes=notes,
@@ -592,6 +603,7 @@ def write_phase1_html_report(
     output_path: str | Path,
     report_date: str,
     data_quality_summary: pd.DataFrame | None = None,
+    trend_filter_summary: pd.DataFrame | None = None,
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     notes: list[str] | None = None,
@@ -615,6 +627,7 @@ def write_phase1_html_report(
         correlation_pairs=correlation_pairs,
         chart_paths=chart_paths,
         report_date=report_date,
+        trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         run_configuration=run_configuration,
         notes=notes,

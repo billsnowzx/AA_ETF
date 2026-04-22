@@ -62,6 +62,19 @@ def _sample_run_configuration() -> pd.DataFrame:
     )
 
 
+def _sample_trend_filter_summary() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "observations": [3],
+            "trend_active_days": [2],
+            "trend_active_ratio": [2.0 / 3.0],
+            "avg_reduced_assets": [2.0 / 3.0],
+            "max_reduced_assets": [1],
+        },
+        index=pd.Index(["balanced"], name="portfolio"),
+    )
+
+
 def test_build_phase1_report_markdown_contains_key_sections() -> None:
     performance_summary = _sample_frame()
     turnover_summary = pd.DataFrame(
@@ -138,6 +151,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         correlation_pairs=correlation_pairs,
         chart_paths=chart_paths,
         report_date="2026-04-18",
+        trend_filter_summary=_sample_trend_filter_summary(),
         rolling_metric_snapshot=rolling_metric_snapshot,
         run_configuration=_sample_run_configuration(),
         notes=["IAGG failed the liquidity filter"],
@@ -152,6 +166,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "## Benchmark Annual Excess Returns" in report
     assert "## Benchmark Drawdown Comparisons" in report
     assert "## Latest Rolling Metrics" in report
+    assert "## Trend Filter Summary" in report
     assert "## Data Quality Summary" in report
     assert "## Run Configuration" in report
     assert "config\\etf_universe.yaml" in report
@@ -229,6 +244,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
         correlation_pairs=correlation_pairs,
         chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
         report_date="2026-04-19",
+        trend_filter_summary=_sample_trend_filter_summary(),
         run_configuration=_sample_run_configuration(),
         rolling_metric_snapshot=pd.DataFrame(
             {"balanced": [0.12, 0.8]},
@@ -243,6 +259,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "<h2>Benchmark Annual Excess Returns</h2>" in report
     assert "<h2>Benchmark Drawdown Comparisons</h2>" in report
     assert "<h2>Latest Rolling Metrics</h2>" in report
+    assert "<h2>Trend Filter Summary</h2>" in report
     assert "<h2>Data Quality Summary</h2>" in report
     assert "<h2>Run Configuration</h2>" in report
     assert "config\\etf_universe.yaml" in report
@@ -385,6 +402,7 @@ def test_write_phase1_report_creates_markdown_file() -> None:
             chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
             output_path=output_path,
             report_date="2026-04-18",
+            trend_filter_summary=_sample_trend_filter_summary(),
             run_configuration=_sample_run_configuration(),
             notes=None,
         )
@@ -469,6 +487,7 @@ def test_write_phase1_html_report_creates_html_file() -> None:
             chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
             output_path=output_path,
             report_date="2026-04-19",
+            trend_filter_summary=_sample_trend_filter_summary(),
             run_configuration=_sample_run_configuration(),
             notes=None,
         )

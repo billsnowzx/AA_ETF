@@ -799,6 +799,7 @@ def main() -> None:
 
     performance_summary = build_performance_summary(strategy_name, strategy_result, benchmark_results)
     turnover_summary = build_turnover_summary(strategy_name, strategy_result, benchmark_results)
+    trend_filter_summary = build_trend_filter_summary(strategy_name, strategy_result)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
     rolling_metric_snapshot = build_latest_rolling_metric_snapshot(
         rolling_outputs["rolling_volatility"],
@@ -851,6 +852,7 @@ def main() -> None:
         chart_paths=chart_paths,
         output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.md",
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
+        trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         run_configuration=run_configuration,
         notes=report_notes,
@@ -872,6 +874,7 @@ def main() -> None:
         chart_paths=chart_paths,
         output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.html",
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
+        trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         run_configuration=run_configuration,
         notes=report_notes,

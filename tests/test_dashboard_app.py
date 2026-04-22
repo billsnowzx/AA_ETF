@@ -62,6 +62,16 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
             index=pd.Index(["VTI"], name="ticker"),
         ).to_csv(table_dir / "data_quality_summary.csv")
         pd.DataFrame(
+            {
+                "observations": [3],
+                "trend_active_days": [2],
+                "trend_active_ratio": [2.0 / 3.0],
+                "avg_reduced_assets": [2.0 / 3.0],
+                "max_reduced_assets": [1],
+            },
+            index=pd.Index(["balanced"], name="portfolio"),
+        ).to_csv(table_dir / "trend_filter_summary.csv")
+        pd.DataFrame(
             {"value": ["2024-01-01", "liquidity_filtered", "config\\risk_limits.yaml"]},
             index=pd.Index(["start", "backtest_universe_mode", "config_risk_limits"]),
         ).to_csv(table_dir / "run_configuration.csv")
@@ -111,6 +121,8 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "liquidity_filtered" in html
         assert "config/etf_universe.yaml" in html
         assert "Data Quality Summary" in html
+        assert "Trend Filter Summary" in html
+        assert "66.67%" in html
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
 
@@ -139,6 +151,15 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
             "run_configuration": pd.DataFrame({"value": ["config\\risk_limits.yaml"]}, index=pd.Index(["config_risk_limits"])),
             "output_inventory": pd.DataFrame({"name": ["performance_summary"], "size_bytes": [1234]}),
             "data_quality_summary": pd.DataFrame({"observations": [2], "missing_volume": [0]}),
+            "trend_filter_summary": pd.DataFrame(
+                {
+                    "observations": [3],
+                    "trend_active_days": [2],
+                    "trend_active_ratio": [2.0 / 3.0],
+                    "avg_reduced_assets": [2.0 / 3.0],
+                    "max_reduced_assets": [1],
+                }
+            ),
             "etf_summary": pd.DataFrame(
                 {
                     "average_dollar_volume": [1_000_000.0],
@@ -163,6 +184,8 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["run_configuration"].loc["config_risk_limits", "value"] == "config\\risk_limits.yaml"
     assert tables["output_inventory"].iloc[0]["size_bytes"] == "1234"
     assert tables["data_quality_summary"].iloc[0]["observations"] == "2"
+    assert tables["trend_filter_summary"].iloc[0]["trend_active_ratio"] == "66.67%"
+    assert tables["trend_filter_summary"].iloc[0]["max_reduced_assets"] == "1"
     assert tables["etf_summary"].loc["VTI", "average_dollar_volume"] == "1000000"
 
 
