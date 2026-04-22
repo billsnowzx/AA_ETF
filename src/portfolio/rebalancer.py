@@ -40,6 +40,27 @@ def load_relative_drift_threshold(config_path: str | Path) -> float:
     return float(drift_rule["relative_deviation_threshold"])
 
 
+def load_trend_filter_settings(config_path: str | Path) -> dict[str, bool | int | float]:
+    """Load and validate trend-filter settings from rebalance config."""
+    config = load_rebalance_rules(config_path)
+    trend_filter = config.get("trend_filter", {})
+
+    enabled = bool(trend_filter.get("enabled", False))
+    moving_average_months = int(trend_filter.get("moving_average_months", 10))
+    reduction_fraction = float(trend_filter.get("reduction_fraction", 0.50))
+
+    if moving_average_months < 1:
+        raise ValueError("trend_filter.moving_average_months must be >= 1.")
+    if reduction_fraction < 0.0 or reduction_fraction > 1.0:
+        raise ValueError("trend_filter.reduction_fraction must be between 0 and 1.")
+
+    return {
+        "enabled": enabled,
+        "moving_average_months": moving_average_months,
+        "reduction_fraction": reduction_fraction,
+    }
+
+
 def weight_drift_table(
     target_weights: dict[str, float] | pd.Series,
     current_weights: dict[str, float] | pd.Series,

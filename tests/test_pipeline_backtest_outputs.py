@@ -9,6 +9,7 @@ import pandas as pd
 from run_pipeline import (
     build_asset_return_matrix,
     build_nav_table,
+    build_trend_filter_overlay_settings,
     build_backtest_policy_tables,
     find_missing_output_inventory_entries,
     build_output_inventory,
@@ -93,6 +94,53 @@ def test_collect_required_backtest_tickers_includes_strategy_and_benchmarks() ->
     )
 
     assert tickers == ["VTI", "VEA", "IEMG", "AGG", "BNDX", "GLD", "VNQ"]
+
+
+def test_build_trend_filter_overlay_settings_selects_equity_like_assets() -> None:
+    settings = build_trend_filter_overlay_settings(
+        rebalance_config="config/rebalance_rules.yaml",
+        universe_config="config/etf_universe.yaml",
+        backtest_tickers=["VTI", "VEA", "IEMG", "AGG", "GLD", "VNQ"],
+    )
+
+    assert settings["enabled"] is False
+    assert settings["moving_average_days"] == 210
+    assert settings["assets"] == []
+
+
+def test_build_trend_filter_overlay_settings_enabled_uses_equity_and_reit_assets() -> None:
+    rebalance_config_path = Path("data/cache") / f"test_rebalance_trend_{uuid.uuid4().hex}.yaml"
+    rebalance_config_path.parent.mkdir(parents=True, exist_ok=True)
+    rebalance_config_path.write_text(
+        "\n".join(
+            [
+                "standard_rebalance:",
+                "  frequency: quarterly",
+                "weight_drift_rule:",
+                "  enabled: true",
+                "  relative_deviation_threshold: 0.20",
+                "trend_filter:",
+                "  enabled: true",
+                "  moving_average_months: 6",
+                "  reduction_fraction: 0.30",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    try:
+        settings = build_trend_filter_overlay_settings(
+            rebalance_config=rebalance_config_path,
+            universe_config="config/etf_universe.yaml",
+            backtest_tickers=["VTI", "VEA", "IEMG", "AGG", "GLD", "VNQ"],
+        )
+        assert settings["enabled"] is True
+        assert settings["moving_average_days"] == 126
+        assert settings["reduction_fraction"] == 0.30
+        assert settings["assets"] == ["VTI", "VEA", "IEMG", "VNQ"]
+    finally:
+        rebalance_config_path.unlink(missing_ok=True)
 
 
 def test_resolve_backtest_tickers_configured_mode_keeps_required_assets() -> None:
@@ -181,6 +229,8 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert (output_dir / "correlation_pairs.csv").exists()
         assert (output_dir / "top_correlation_pairs.csv").exists()
         assert (output_dir / "asset_risk_snapshot.csv").exists()
+        assert (output_dir / "trend_filter_active.csv").exists()
+        assert (output_dir / "trend_filter_scales.csv").exists()
         assert (output_dir / "rolling_volatility.csv").exists()
         assert (output_dir / "rolling_sharpe.csv").exists()
         assert (output_dir / "drawdown_series.csv").exists()

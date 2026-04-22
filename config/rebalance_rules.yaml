@@ -13,7 +13,7 @@ trend_filter:
   enabled: false
   moving_average_months: 10
   reduction_fraction: 0.50
-  note: Placeholder only in Phase 1. No execution logic is implemented yet.
+  note: If enabled, equity and REIT allocations are reduced when prior close is below the configured moving average.
 
 risk_switch:
   enabled: false

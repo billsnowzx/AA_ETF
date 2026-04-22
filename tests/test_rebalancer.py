@@ -4,6 +4,7 @@ from src.portfolio.rebalancer import (
     breached_rebalance_assets,
     load_relative_drift_threshold,
     load_standard_rebalance_frequency,
+    load_trend_filter_settings,
     should_rebalance_by_config,
     should_rebalance_by_drift,
     weight_drift_table,
@@ -13,9 +14,13 @@ from src.portfolio.rebalancer import (
 def test_load_rebalance_rule_values_from_config() -> None:
     frequency = load_standard_rebalance_frequency("config/rebalance_rules.yaml")
     threshold = load_relative_drift_threshold("config/rebalance_rules.yaml")
+    trend_filter = load_trend_filter_settings("config/rebalance_rules.yaml")
 
     assert frequency == "quarterly"
     assert math.isclose(threshold, 0.20, rel_tol=1e-9)
+    assert trend_filter["enabled"] is False
+    assert trend_filter["moving_average_months"] == 10
+    assert math.isclose(float(trend_filter["reduction_fraction"]), 0.50, rel_tol=1e-9)
 
 
 def test_weight_drift_table_matches_spec_example() -> None:

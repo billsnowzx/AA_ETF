@@ -132,3 +132,66 @@ def test_run_fixed_weight_backtest_includes_benchmark_outputs() -> None:
     assert "benchmark_a" in result["benchmark_comparisons"].index
     assert "benchmark_a" in result["benchmark_annual_excess_returns"].columns
     assert "benchmark_a" in result["benchmark_drawdown_comparisons"].index
+
+
+def test_run_fixed_weight_backtest_applies_trend_filter_on_rebalance_dates() -> None:
+    index = pd.to_datetime(["2024-01-31", "2024-02-01", "2024-03-01"])
+    asset_returns = pd.DataFrame(
+        {
+            "VTI": [0.0, 0.0, 0.0],
+            "AGG": [0.0, 0.0, 0.0],
+        },
+        index=index,
+    )
+    adj_close = pd.DataFrame(
+        {
+            "VTI": [100.0, 90.0, 80.0],
+            "AGG": [100.0, 100.0, 100.0],
+        },
+        index=index,
+    )
+
+    result = run_fixed_weight_backtest(
+        asset_returns,
+        {"VTI": 0.6, "AGG": 0.4},
+        rebalance_frequency="monthly",
+        one_way_bps=0.0,
+        adj_close=adj_close,
+        trend_filter={
+            "enabled": True,
+            "moving_average_days": 2,
+            "reduction_fraction": 0.5,
+            "assets": ["VTI"],
+        },
+    )
+
+    weights_start = result["weights_start"]
+    trend_active = result["trend_filter_active"]
+    trend_scales = result["trend_filter_scales"]
+
+    assert math.isclose(float(weights_start.loc[pd.Timestamp("2024-03-01"), "VTI"]), 0.4285714286, rel_tol=1e-9)
+    assert bool(trend_active.loc[pd.Timestamp("2024-03-01")]) is True
+    assert math.isclose(float(trend_scales.loc[pd.Timestamp("2024-03-01"), "VTI"]), 0.5, rel_tol=1e-9)
+
+
+def test_run_fixed_weight_backtest_trend_filter_requires_adj_close_data() -> None:
+    asset_returns = pd.DataFrame(
+        {"VTI": [0.01, 0.02]},
+        index=pd.date_range("2024-01-01", periods=2),
+    )
+
+    try:
+        run_fixed_weight_backtest(
+            asset_returns,
+            {"VTI": 1.0},
+            trend_filter={
+                "enabled": True,
+                "moving_average_days": 2,
+                "reduction_fraction": 0.5,
+                "assets": ["VTI"],
+            },
+        )
+    except ValueError as exc:
+        assert "adjusted-close data" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError when trend filter is enabled without adjusted-close data.")

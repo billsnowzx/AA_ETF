@@ -35,6 +35,7 @@ from src.portfolio.policy import (
     summarize_backtest_universe_validation,
 )
 from src.portfolio.rebalancer import load_standard_rebalance_frequency
+from src.portfolio.rebalancer import load_trend_filter_settings
 from src.portfolio.transaction_cost import load_one_way_transaction_cost_bps
 from src.portfolio.weights import load_portfolio_template
 from src.universe.etf_scoring import score_etf_universe
@@ -182,6 +183,8 @@ def run_strategy_backtests(
     benchmark_config: str | Path,
     rebalance_config: str | Path,
     template_name: str | None = None,
+    adj_close: pd.DataFrame | None = None,
+    trend_filter_settings: dict[str, object] | None = None,
 ) -> tuple[str, dict[str, pd.Series | pd.DataFrame], dict[str, dict[str, pd.Series | pd.DataFrame]]]:
     """Run the default strategy portfolio and configured benchmarks."""
     strategy_name = template_name or "balanced"
@@ -209,8 +212,42 @@ def run_strategy_backtests(
         rebalance_frequency=rebalance_frequency,
         one_way_bps=one_way_bps,
         benchmark_returns=benchmark_return_series,
+        adj_close=adj_close,
+        trend_filter=trend_filter_settings,
     )
     return strategy_name, strategy_result, benchmark_results
+
+
+def build_trend_filter_overlay_settings(
+    rebalance_config: str | Path,
+    universe_config: str | Path,
+    backtest_tickers: list[str],
+) -> dict[str, object]:
+    """Build trend-filter settings with equity-like assets resolved from universe metadata."""
+    settings = load_trend_filter_settings(rebalance_config)
+    if not bool(settings["enabled"]):
+        return {
+            "enabled": False,
+            "moving_average_days": int(settings["moving_average_months"]) * 21,
+            "reduction_fraction": float(settings["reduction_fraction"]),
+            "assets": [],
+        }
+
+    universe_metadata = load_enabled_universe(universe_config)
+    selected_assets: list[str] = []
+    for ticker in backtest_tickers:
+        if ticker not in universe_metadata.index:
+            continue
+        asset_class = str(universe_metadata.loc[ticker, "asset_class"] or "").lower()
+        if "equity" in asset_class or "reit" in asset_class:
+            selected_assets.append(ticker)
+
+    return {
+        "enabled": True,
+        "moving_average_days": int(settings["moving_average_months"]) * 21,
+        "reduction_fraction": float(settings["reduction_fraction"]),
+        "assets": selected_assets,
+    }
 
 
 def build_backtest_policy_tables(
@@ -341,6 +378,10 @@ def write_backtest_outputs(
     risk_outputs["correlation_pairs"].to_csv(output_path / "correlation_pairs.csv", index=False)
     risk_outputs["top_correlation_pairs"].to_csv(output_path / "top_correlation_pairs.csv", index=False)
     risk_outputs["asset_risk_snapshot"].to_csv(output_path / "asset_risk_snapshot.csv", index=True)
+    if "trend_filter_active" in strategy_result:
+        strategy_result["trend_filter_active"].to_csv(output_path / "trend_filter_active.csv", index=True)
+    if "trend_filter_scales" in strategy_result:
+        strategy_result["trend_filter_scales"].to_csv(output_path / "trend_filter_scales.csv", index=True)
 
     LOGGER.info("Saved performance summary to %s", output_path / "performance_summary.csv")
     LOGGER.info("Saved turnover summary to %s", output_path / "turnover_summary.csv")
@@ -352,6 +393,10 @@ def write_backtest_outputs(
     LOGGER.info("Saved correlation matrix to %s", output_path / "correlation_matrix.csv")
     LOGGER.info("Saved top correlation pairs to %s", output_path / "top_correlation_pairs.csv")
     LOGGER.info("Saved asset risk snapshot to %s", output_path / "asset_risk_snapshot.csv")
+    if "trend_filter_active" in strategy_result:
+        LOGGER.info("Saved trend filter active flags to %s", output_path / "trend_filter_active.csv")
+    if "trend_filter_scales" in strategy_result:
+        LOGGER.info("Saved trend filter scales to %s", output_path / "trend_filter_scales.csv")
 
 
 def build_nav_table(
@@ -647,12 +692,21 @@ def main() -> None:
     )
 
     asset_returns = build_asset_return_matrix(clean_frames, tickers=backtest_tickers)
+    backtest_adj_close = build_adjusted_close_matrix({ticker: clean_frames[ticker] for ticker in backtest_tickers})
+    trend_filter_settings = build_trend_filter_overlay_settings(
+        rebalance_config=args.rebalance_config,
+        universe_config=args.universe_config,
+        backtest_tickers=backtest_tickers,
+    )
+
     strategy_name, strategy_result, benchmark_results = run_strategy_backtests(
         asset_returns,
         portfolio_template_config=args.portfolio_config,
         benchmark_config=args.benchmark_config,
         rebalance_config=args.rebalance_config,
         template_name=args.template_name,
+        adj_close=backtest_adj_close,
+        trend_filter_settings=trend_filter_settings,
     )
     policy_validation, policy_summary = build_backtest_policy_tables(
         strategy_name=strategy_name,
@@ -698,6 +752,13 @@ def main() -> None:
             + ", ".join(non_liquid_required_assets)
         )
     report_notes.append(f"Backtest universe mode: {args.backtest_universe_mode}")
+    if bool(trend_filter_settings["enabled"]):
+        report_notes.append(
+            "Trend filter enabled for assets: "
+            + ", ".join(trend_filter_settings["assets"])
+            + f" (moving_average_days={trend_filter_settings['moving_average_days']}, "
+            + f"reduction_fraction={trend_filter_settings['reduction_fraction']:.2f})"
+        )
     config_paths = {
         "universe": args.universe_config,
         "portfolio_templates": args.portfolio_config,

@@ -47,6 +47,15 @@ def _standardize_download_frame(raw_frame: pd.DataFrame, ticker: str) -> pd.Data
     return frame
 
 
+def configure_yfinance_tz_cache(cache_dir: str | Path = "data/cache/yfinance_tz") -> Path:
+    """Configure yfinance timezone cache location to a writable workspace path."""
+    cache_path = Path(cache_dir)
+    cache_path.mkdir(parents=True, exist_ok=True)
+    if hasattr(yf, "set_tz_cache_location"):
+        yf.set_tz_cache_location(str(cache_path))
+    return cache_path
+
+
 def fetch_price_history(
     ticker: str,
     start: str | None = None,
@@ -54,6 +63,8 @@ def fetch_price_history(
 ) -> pd.DataFrame:
     """Fetch and standardize daily OHLCV data for a single ticker."""
     start, end = validate_date_range(start, end)
+    cache_path = configure_yfinance_tz_cache()
+    LOGGER.debug("Configured yfinance timezone cache path: %s", cache_path)
     LOGGER.info("Downloading price data for %s", ticker)
     raw_frame = yf.download(
         tickers=ticker,

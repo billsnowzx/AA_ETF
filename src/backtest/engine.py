@@ -22,6 +22,54 @@ FREQUENCY_TO_PERIOD = {
 }
 
 
+def apply_trend_scale_to_target_weights(
+    target_weights: pd.Series,
+    trend_scales: pd.Series,
+) -> pd.Series:
+    """Apply per-asset trend scales to target weights and renormalize."""
+    scaled = target_weights.copy()
+    if not trend_scales.empty:
+        aligned_scales = trend_scales.reindex(scaled.index, fill_value=1.0)
+        scaled = scaled * aligned_scales
+    total_weight = float(scaled.sum())
+    if total_weight <= 0:
+        return target_weights.copy()
+    return scaled / total_weight
+
+
+def build_trend_scale_table(
+    adj_close: pd.DataFrame,
+    asset_index: pd.Index,
+    trend_assets: list[str],
+    moving_average_days: int,
+    reduction_fraction: float,
+) -> pd.DataFrame:
+    """Build execution-date trend scales using prior-day close vs moving average."""
+    trend_scale_table = pd.DataFrame(1.0, index=asset_index, columns=adj_close.columns, dtype=float)
+    if not trend_assets:
+        return trend_scale_table
+
+    missing_assets = [asset for asset in trend_assets if asset not in adj_close.columns]
+    if missing_assets:
+        raise ValueError(f"Trend filter assets are missing from adjusted-close data: {missing_assets}")
+
+    trend_prices = adj_close[trend_assets].sort_index()
+    moving_average = trend_prices.rolling(window=moving_average_days, min_periods=moving_average_days).mean()
+    scale_for_signal_dates = pd.DataFrame(
+        1.0,
+        index=trend_prices.index,
+        columns=trend_assets,
+        dtype=float,
+    )
+    scale_for_signal_dates = scale_for_signal_dates.where(
+        trend_prices >= moving_average,
+        other=1.0 - reduction_fraction,
+    )
+    execution_scales = scale_for_signal_dates.shift(1).reindex(asset_index).fillna(1.0)
+    trend_scale_table.loc[:, trend_assets] = execution_scales
+    return trend_scale_table
+
+
 def resolve_rebalance_period_alias(frequency: str) -> str:
     """Resolve a user-facing rebalance frequency to a pandas period alias."""
     normalized = frequency.lower()
@@ -114,6 +162,8 @@ def run_fixed_weight_backtest(
     initial_nav: float = 1.0,
     benchmark_returns: Mapping[str, pd.Series] | None = None,
     periods_per_year: int = 252,
+    adj_close: pd.DataFrame | None = None,
+    trend_filter: Mapping[str, object] | None = None,
 ) -> dict[str, pd.Series | pd.DataFrame]:
     """Run a simple fixed-weight portfolio backtest with explicit turnover and costs."""
     if asset_returns.empty:
@@ -122,6 +172,26 @@ def run_fixed_weight_backtest(
     asset_returns = asset_returns.sort_index()
     aligned_target = align_weights_to_returns(asset_returns, target_weights)
     rebalance_dates = set(calendar_rebalance_dates(asset_returns.index, frequency=rebalance_frequency))
+    trend_scale_table = pd.DataFrame(1.0, index=asset_returns.index, columns=asset_returns.columns, dtype=float)
+    trend_active_flags = pd.Series(False, index=asset_returns.index, name="trend_filter_active")
+    if trend_filter and bool(trend_filter.get("enabled", False)):
+        if adj_close is None or adj_close.empty:
+            raise ValueError("Trend filter requires non-empty adjusted-close data.")
+        moving_average_days = int(trend_filter.get("moving_average_days", 210))
+        reduction_fraction = float(trend_filter.get("reduction_fraction", 0.50))
+        trend_assets = [asset for asset in trend_filter.get("assets", []) if asset in asset_returns.columns]
+        if moving_average_days < 1:
+            raise ValueError("Trend filter moving_average_days must be >= 1.")
+        if reduction_fraction < 0.0 or reduction_fraction > 1.0:
+            raise ValueError("Trend filter reduction_fraction must be between 0 and 1.")
+        trend_scale_table = build_trend_scale_table(
+            adj_close=adj_close.reindex(asset_returns.index),
+            asset_index=asset_returns.index,
+            trend_assets=trend_assets,
+            moving_average_days=moving_average_days,
+            reduction_fraction=reduction_fraction,
+        )
+        trend_active_flags = trend_scale_table.lt(1.0).any(axis=1).rename("trend_filter_active")
 
     current_weights = pd.Series(0.0, index=asset_returns.columns, dtype=float)
     nav = float(initial_nav)
@@ -140,13 +210,17 @@ def run_fixed_weight_backtest(
         weights_before_return = current_weights.copy()
 
         if rebalance_flag:
-            turnover = turnover_traded_weight(aligned_target, weights_before_return)
-            cost_drag = transaction_cost_drag(
+            effective_target = apply_trend_scale_to_target_weights(
                 aligned_target,
+                trend_scale_table.loc[date],
+            )
+            turnover = turnover_traded_weight(effective_target, weights_before_return)
+            cost_drag = transaction_cost_drag(
+                effective_target,
                 current_weights=weights_before_return,
                 one_way_bps=one_way_bps,
             )
-            weights_before_return = aligned_target.copy()
+            weights_before_return = effective_target.copy()
         else:
             turnover = 0.0
             cost_drag = 0.0
@@ -194,6 +268,8 @@ def run_fixed_weight_backtest(
         "rebalance_flags": rebalance_flag_series,
         "weights_start": weights_start,
         "weights_end": weights_end,
+        "trend_filter_scales": trend_scale_table,
+        "trend_filter_active": trend_active_flags,
         "summary": risk_summary(portfolio_returns, periods_per_year=periods_per_year),
         "annual_return_table": compile_annual_return_table(
             portfolio_returns,

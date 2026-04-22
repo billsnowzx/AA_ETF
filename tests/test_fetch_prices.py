@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.data.fetch_prices import fetch_price_history, fetch_prices
+from src.data.fetch_prices import configure_yfinance_tz_cache, fetch_price_history, fetch_prices
 
 
 def _sample_download_frame(multi_index: bool = False) -> pd.DataFrame:
@@ -66,3 +66,20 @@ def test_fetch_prices_saves_per_ticker_csv(monkeypatch) -> None:
         assert (output_dir / "VEA.csv").exists()
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_configure_yfinance_tz_cache_uses_workspace_path(monkeypatch) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_set_tz_cache_location(path: str) -> None:
+        captured["path"] = path
+
+    monkeypatch.setattr("src.data.fetch_prices.yf.set_tz_cache_location", fake_set_tz_cache_location)
+
+    output_path = Path("data/cache") / f"test_yf_tz_{uuid.uuid4().hex}"
+    try:
+        cache_path = configure_yfinance_tz_cache(output_path)
+        assert cache_path.exists()
+        assert captured["path"] == str(output_path)
+    finally:
+        shutil.rmtree(output_path, ignore_errors=True)
