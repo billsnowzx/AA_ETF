@@ -72,6 +72,13 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
             index=pd.Index(["balanced"], name="portfolio"),
         ).to_csv(table_dir / "trend_filter_summary.csv")
         pd.DataFrame(
+            {
+                "balanced": ["none", "calendar", "calendar+drift"],
+                "benchmark_a": ["calendar", "none", "drift"],
+            },
+            index=pd.Index(["2024-01-02", "2024-01-03", "2024-01-04"], name="date"),
+        ).to_csv(table_dir / "rebalance_reason.csv")
+        pd.DataFrame(
             {"value": ["2024-01-01", "liquidity_filtered", "config\\risk_limits.yaml"]},
             index=pd.Index(["start", "backtest_universe_mode", "config_risk_limits"]),
         ).to_csv(table_dir / "run_configuration.csv")
@@ -123,6 +130,8 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Data Quality Summary" in html
         assert "Trend Filter Summary" in html
         assert "66.67%" in html
+        assert "Recent Rebalance Reasons" in html
+        assert "calendar+drift" in html
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
 
@@ -160,6 +169,7 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
                     "max_reduced_assets": [1],
                 }
             ),
+            "rebalance_reason": pd.DataFrame({"balanced": ["calendar+drift"]}, index=pd.Index(["2024-01-04"])),
             "etf_summary": pd.DataFrame(
                 {
                     "average_dollar_volume": [1_000_000.0],
@@ -186,6 +196,7 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["data_quality_summary"].iloc[0]["observations"] == "2"
     assert tables["trend_filter_summary"].iloc[0]["trend_active_ratio"] == "66.67%"
     assert tables["trend_filter_summary"].iloc[0]["max_reduced_assets"] == "1"
+    assert tables["rebalance_reason"].iloc[0]["balanced"] == "calendar+drift"
     assert tables["etf_summary"].loc["VTI", "average_dollar_volume"] == "1000000"
 
 

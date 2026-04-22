@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.dashboard.reporting import (
+    build_rebalance_reason_summary,
     build_asset_risk_snapshot,
     build_latest_rolling_metric_snapshot,
     build_phase1_report_html,
@@ -72,6 +73,16 @@ def _sample_trend_filter_summary() -> pd.DataFrame:
             "max_reduced_assets": [1],
         },
         index=pd.Index(["balanced"], name="portfolio"),
+    )
+
+
+def _sample_rebalance_reason_table() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "balanced": ["none", "calendar", "calendar+drift", "none"],
+            "benchmark_a": ["calendar", "none", "drift", "none"],
+        },
+        index=pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"]),
     )
 
 
@@ -153,6 +164,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         report_date="2026-04-18",
         trend_filter_summary=_sample_trend_filter_summary(),
         rolling_metric_snapshot=rolling_metric_snapshot,
+        rebalance_reason_table=_sample_rebalance_reason_table(),
         run_configuration=_sample_run_configuration(),
         notes=["IAGG failed the liquidity filter"],
     )
@@ -167,11 +179,14 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "## Benchmark Drawdown Comparisons" in report
     assert "## Latest Rolling Metrics" in report
     assert "## Trend Filter Summary" in report
+    assert "## Rebalance Reason Summary" in report
+    assert "## Recent Rebalance Events" in report
     assert "## Data Quality Summary" in report
     assert "## Run Configuration" in report
     assert "config\\etf_universe.yaml" in report
     assert "missing_volume" in report
     assert "12.00%" in report
+    assert "calendar+drift" in report
 
 
 def test_build_phase1_report_html_contains_key_sections() -> None:
@@ -250,6 +265,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
             {"balanced": [0.12, 0.8]},
             index=["latest_rolling_volatility", "latest_rolling_sharpe"],
         ),
+        rebalance_reason_table=_sample_rebalance_reason_table(),
         notes=["Backtest universe mode: liquidity_filtered"],
     )
 
@@ -260,11 +276,25 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "<h2>Benchmark Drawdown Comparisons</h2>" in report
     assert "<h2>Latest Rolling Metrics</h2>" in report
     assert "<h2>Trend Filter Summary</h2>" in report
+    assert "<h2>Rebalance Reason Summary</h2>" in report
+    assert "<h2>Recent Rebalance Events</h2>" in report
     assert "<h2>Data Quality Summary</h2>" in report
     assert "<h2>Run Configuration</h2>" in report
     assert "config\\etf_universe.yaml" in report
     assert "missing_volume" in report
     assert "12.00%" in report
+    assert "calendar+drift" in report
+
+
+def test_build_rebalance_reason_summary_counts_trigger_types() -> None:
+    summary = build_rebalance_reason_summary(_sample_rebalance_reason_table())
+
+    assert int(summary.loc["balanced", "total_days"]) == 4
+    assert int(summary.loc["balanced", "rebalance_days"]) == 2
+    assert float(summary.loc["balanced", "rebalance_ratio"]) == 0.5
+    assert int(summary.loc["balanced", "calendar_days"]) == 2
+    assert int(summary.loc["balanced", "drift_days"]) == 1
+    assert int(summary.loc["balanced", "calendar_and_drift_days"]) == 1
 
 
 def test_risk_summary_helpers_build_expected_tables() -> None:

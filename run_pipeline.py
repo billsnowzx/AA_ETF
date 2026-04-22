@@ -336,6 +336,33 @@ def build_turnover_summary(
     return pd.DataFrame(rows).set_index("portfolio")
 
 
+def build_rebalance_reason_table(
+    strategy_name: str,
+    strategy_result: dict[str, pd.Series | pd.DataFrame],
+    benchmark_results: dict[str, dict[str, pd.Series | pd.DataFrame]],
+) -> pd.DataFrame:
+    """Build a per-date rebalance-reason audit table for strategy and benchmarks."""
+    def extract_reasons(result: dict[str, pd.Series | pd.DataFrame]) -> pd.Series:
+        series = result.get("rebalance_reasons")
+        if isinstance(series, pd.Series):
+            return series
+
+        for fallback_key in ["portfolio_returns", "portfolio_nav", "turnover"]:
+            fallback = result.get(fallback_key)
+            if isinstance(fallback, pd.Series):
+                return pd.Series("none", index=fallback.index, dtype=object)
+        return pd.Series(dtype=object)
+
+    table = pd.DataFrame(
+        {
+            strategy_name: extract_reasons(strategy_result),
+            **{name: extract_reasons(result) for name, result in benchmark_results.items()},
+        }
+    )
+    table.index.name = "date"
+    return table
+
+
 def build_trend_filter_summary(
     strategy_name: str,
     strategy_result: dict[str, pd.Series | pd.DataFrame],
@@ -431,15 +458,10 @@ def write_backtest_outputs(
     benchmark_annual_excess_returns = strategy_result["benchmark_annual_excess_returns"]
     benchmark_drawdown_comparisons = strategy_result["benchmark_drawdown_comparisons"]
     trend_filter_summary = build_trend_filter_summary(strategy_name, strategy_result)
+    rebalance_reason_table = build_rebalance_reason_table(strategy_name, strategy_result, benchmark_results)
     nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
-    rebalance_reason_table = pd.DataFrame(
-        {
-            strategy_name: strategy_result["rebalance_reasons"],
-            **{name: result["rebalance_reasons"] for name, result in benchmark_results.items()},
-        }
-    )
 
     performance_summary.to_csv(output_path / "performance_summary.csv", index=True)
     turnover_summary.to_csv(output_path / "turnover_summary.csv", index=True)
@@ -824,6 +846,7 @@ def main() -> None:
     performance_summary = build_performance_summary(strategy_name, strategy_result, benchmark_results)
     turnover_summary = build_turnover_summary(strategy_name, strategy_result, benchmark_results)
     trend_filter_summary = build_trend_filter_summary(strategy_name, strategy_result)
+    rebalance_reason_table = build_rebalance_reason_table(strategy_name, strategy_result, benchmark_results)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
     rolling_metric_snapshot = build_latest_rolling_metric_snapshot(
         rolling_outputs["rolling_volatility"],
@@ -878,6 +901,7 @@ def main() -> None:
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
+        rebalance_reason_table=rebalance_reason_table,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -900,6 +924,7 @@ def main() -> None:
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
+        rebalance_reason_table=rebalance_reason_table,
         run_configuration=run_configuration,
         notes=report_notes,
     )

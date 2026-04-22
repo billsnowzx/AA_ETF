@@ -220,6 +220,7 @@ def build_dashboard_html(
     etf_summary = _read_csv_if_exists(output_path / "etf_summary.csv")
     data_quality_summary = _read_csv_if_exists(output_path / "data_quality_summary.csv")
     trend_filter_summary = _read_csv_if_exists(output_path / "trend_filter_summary.csv")
+    rebalance_reason = _read_csv_if_exists(output_path / "rebalance_reason.csv")
     run_configuration = _read_csv_if_exists(output_path / "run_configuration.csv")
     output_inventory = _read_csv_if_exists(output_path / "output_inventory.csv", index_col=None)
     rolling_volatility = _read_csv_if_exists(output_path / "rolling_volatility.csv")
@@ -236,6 +237,7 @@ def build_dashboard_html(
             "etf_summary": etf_summary,
             "data_quality_summary": data_quality_summary,
             "trend_filter_summary": trend_filter_summary,
+            "rebalance_reason": rebalance_reason.tail(20),
             "run_configuration": run_configuration,
             "output_inventory": output_inventory,
             "rolling_volatility": rolling_volatility.tail(5),
@@ -252,6 +254,7 @@ def build_dashboard_html(
     etf_summary = formatted_tables["etf_summary"]
     data_quality_summary = formatted_tables["data_quality_summary"]
     trend_filter_summary = formatted_tables["trend_filter_summary"]
+    rebalance_reason = formatted_tables["rebalance_reason"]
     run_configuration = formatted_tables["run_configuration"]
     output_inventory = formatted_tables["output_inventory"]
     rolling_volatility = formatted_tables["rolling_volatility"]
@@ -419,6 +422,10 @@ def build_dashboard_html(
       <section class="card">
         <h2>Trend Filter Summary</h2>
         {dataframe_to_html_table(trend_filter_summary)}
+      </section>
+      <section class="card">
+        <h2>Recent Rebalance Reasons</h2>
+        {dataframe_to_html_table(rebalance_reason)}
       </section>
       <section class="card">
         <h2>Latest Rolling Volatility</h2>

@@ -177,6 +177,83 @@ def _format_data_quality_summary(data_quality_summary: pd.DataFrame | None) -> p
     return formatted
 
 
+def build_rebalance_reason_summary(rebalance_reason_table: pd.DataFrame | None) -> pd.DataFrame:
+    """Summarize rebalance trigger reasons by portfolio for audit reporting."""
+    if rebalance_reason_table is None or rebalance_reason_table.empty:
+        return pd.DataFrame()
+
+    rows: list[dict[str, object]] = []
+    for portfolio in rebalance_reason_table.columns:
+        reasons = (
+            rebalance_reason_table[portfolio]
+            .fillna("none")
+            .astype(str)
+            .str.strip()
+            .replace("", "none")
+        )
+        total_days = int(len(reasons))
+        non_none = reasons[reasons != "none"]
+        rebalance_days = int(non_none.shape[0])
+        calendar_days = int(non_none.str.contains("calendar").sum())
+        drift_days = int(non_none.str.contains("drift").sum())
+        both_days = int(non_none.str.contains("calendar").mul(non_none.str.contains("drift")).sum())
+        if non_none.empty:
+            top_reason = "none"
+        else:
+            top_reason = str(non_none.value_counts().index[0])
+
+        rows.append(
+            {
+                "portfolio": portfolio,
+                "total_days": total_days,
+                "rebalance_days": rebalance_days,
+                "rebalance_ratio": float(rebalance_days / total_days) if total_days > 0 else 0.0,
+                "calendar_days": calendar_days,
+                "drift_days": drift_days,
+                "calendar_and_drift_days": both_days,
+                "top_reason": top_reason,
+            }
+        )
+
+    return pd.DataFrame(rows).set_index("portfolio")
+
+
+def _format_rebalance_reason_summary(rebalance_reason_summary: pd.DataFrame | None) -> pd.DataFrame:
+    """Format rebalance summary diagnostics for report presentation."""
+    if rebalance_reason_summary is None or rebalance_reason_summary.empty:
+        return pd.DataFrame()
+
+    formatted = rebalance_reason_summary.astype(object).copy()
+    for column in [
+        "total_days",
+        "rebalance_days",
+        "calendar_days",
+        "drift_days",
+        "calendar_and_drift_days",
+    ]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(lambda value: _format_decimal(value, digits=0))
+    if "rebalance_ratio" in formatted.columns:
+        formatted["rebalance_ratio"] = formatted["rebalance_ratio"].map(_format_percent)
+    return formatted
+
+
+def _build_recent_rebalance_events(rebalance_reason_table: pd.DataFrame | None, limit: int = 20) -> pd.DataFrame:
+    """Build a recent non-empty rebalance event table for reporting."""
+    if rebalance_reason_table is None or rebalance_reason_table.empty:
+        return pd.DataFrame()
+
+    events = rebalance_reason_table.copy()
+    if isinstance(events.index, pd.DatetimeIndex):
+        events.index = events.index.strftime("%Y-%m-%d")
+    events = events.fillna("none").replace("", "none")
+    non_empty_rows = events.apply(lambda row: (row != "none").any(), axis=1)
+    recent = events.loc[non_empty_rows]
+    if recent.empty:
+        return pd.DataFrame()
+    return recent.tail(limit)
+
+
 def build_run_configuration_summary(
     *,
     start: str,
@@ -222,6 +299,7 @@ def build_phase1_report_markdown(
     trend_filter_summary: pd.DataFrame | None = None,
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
+    rebalance_reason_table: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
     """Build a concise Markdown report from Phase 1 pipeline outputs."""
@@ -295,6 +373,8 @@ def build_phase1_report_markdown(
     asset_risk_snapshot = risk_summary_tables["asset_risk_snapshot"]
     rolling_view = _format_rolling_metric_snapshot(rolling_metric_snapshot)
     data_quality_view = _format_data_quality_summary(data_quality_summary)
+    rebalance_summary_view = _format_rebalance_reason_summary(build_rebalance_reason_summary(rebalance_reason_table))
+    recent_rebalance_events = _build_recent_rebalance_events(rebalance_reason_table)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
@@ -355,6 +435,14 @@ Generated: {report_date}
 
 {dataframe_to_markdown_table(trend_view) if not trend_view.empty else "No trend filter summary generated."}
 
+## Rebalance Reason Summary
+
+{dataframe_to_markdown_table(rebalance_summary_view) if not rebalance_summary_view.empty else "No rebalance reason summary generated."}
+
+## Recent Rebalance Events
+
+{dataframe_to_markdown_table(recent_rebalance_events) if not recent_rebalance_events.empty else "No recent rebalance events generated."}
+
 ## ETF Summary
 
 {dataframe_to_markdown_table(etf_view)}
@@ -397,6 +485,7 @@ def build_phase1_report_html(
     trend_filter_summary: pd.DataFrame | None = None,
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
+    rebalance_reason_table: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
     """Build a shareable HTML report from Phase 1 pipeline outputs."""
@@ -470,6 +559,8 @@ def build_phase1_report_html(
     asset_risk_snapshot = risk_summary_tables["asset_risk_snapshot"]
     rolling_view = _format_rolling_metric_snapshot(rolling_metric_snapshot)
     data_quality_view = _format_data_quality_summary(data_quality_summary)
+    rebalance_summary_view = _format_rebalance_reason_summary(build_rebalance_reason_summary(rebalance_reason_table))
+    recent_rebalance_events = _build_recent_rebalance_events(rebalance_reason_table)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
@@ -526,6 +617,8 @@ def build_phase1_report_html(
   <section><h2>Benchmark Drawdown Comparisons</h2>{dataframe_to_html_table(drawdown_view) if not drawdown_view.empty else "<p>No benchmark drawdown comparisons generated.</p>"}</section>
   <section><h2>Latest Rolling Metrics</h2>{dataframe_to_html_table(rolling_view) if not rolling_view.empty else "<p>No rolling metrics generated.</p>"}</section>
   <section><h2>Trend Filter Summary</h2>{dataframe_to_html_table(trend_view) if not trend_view.empty else "<p>No trend filter summary generated.</p>"}</section>
+  <section><h2>Rebalance Reason Summary</h2>{dataframe_to_html_table(rebalance_summary_view) if not rebalance_summary_view.empty else "<p>No rebalance reason summary generated.</p>"}</section>
+  <section><h2>Recent Rebalance Events</h2>{dataframe_to_html_table(recent_rebalance_events) if not recent_rebalance_events.empty else "<p>No recent rebalance events generated.</p>"}</section>
   <section><h2>ETF Summary</h2>{dataframe_to_html_table(etf_view)}</section>
   <section><h2>Data Quality Summary</h2>{dataframe_to_html_table(data_quality_view) if not data_quality_view.empty else "<p>No data quality summary generated.</p>"}</section>
   <section><h2>Correlation Highlights</h2>{dataframe_to_html_table(correlation_summary) if not correlation_summary.empty else "<p>No non-diagonal correlation pairs available.</p>"}</section>
@@ -556,6 +649,7 @@ def write_phase1_report(
     trend_filter_summary: pd.DataFrame | None = None,
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
+    rebalance_reason_table: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
     """Write the Phase 1 Markdown report to disk."""
@@ -579,6 +673,7 @@ def write_phase1_report(
         report_date=report_date,
         trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
+        rebalance_reason_table=rebalance_reason_table,
         run_configuration=run_configuration,
         notes=notes,
     )
@@ -606,6 +701,7 @@ def write_phase1_html_report(
     trend_filter_summary: pd.DataFrame | None = None,
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
+    rebalance_reason_table: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
     """Write the Phase 1 HTML report to disk."""
@@ -629,6 +725,7 @@ def write_phase1_html_report(
         report_date=report_date,
         trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
+        rebalance_reason_table=rebalance_reason_table,
         run_configuration=run_configuration,
         notes=notes,
     )
