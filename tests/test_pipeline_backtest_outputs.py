@@ -30,6 +30,7 @@ from run_pipeline import (
     write_run_configuration_output,
     write_rolling_metric_outputs,
 )
+from src.dashboard.reporting import build_rebalance_reason_summary
 
 
 def _build_clean_frame(prices: list[float]) -> pd.DataFrame:
@@ -260,6 +261,11 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert (output_dir / "rolling_volatility.csv").exists()
         assert (output_dir / "rolling_sharpe.csv").exists()
         assert (output_dir / "drawdown_series.csv").exists()
+
+        rebalance_reason = pd.read_csv(output_dir / "rebalance_reason.csv", index_col=0)
+        rebalance_reason_summary = pd.read_csv(output_dir / "rebalance_reason_summary.csv", index_col=0)
+        expected_summary = build_rebalance_reason_summary(rebalance_reason)
+        pd.testing.assert_frame_equal(rebalance_reason_summary, expected_summary)
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
 
