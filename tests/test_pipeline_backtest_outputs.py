@@ -9,6 +9,7 @@ import pandas as pd
 from run_pipeline import (
     build_asset_return_matrix,
     build_nav_table,
+    build_rebalance_reason_table,
     build_trend_filter_summary,
     build_trend_filter_overlay_settings,
     build_backtest_policy_tables,
@@ -188,6 +189,52 @@ def test_resolve_backtest_tickers_liquidity_filtered_mode_requires_all_assets_to
         assert "failed the liquidity screen" in str(exc)
     else:
         raise AssertionError("Expected ValueError when a required asset fails the liquidity screen.")
+
+
+def test_build_rebalance_reason_table_uses_fallback_none_when_reasons_missing() -> None:
+    index = pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"])
+    strategy_result = {
+        "portfolio_returns": pd.Series([0.01, -0.01, 0.0], index=index),
+    }
+    benchmark_results = {
+        "benchmark_a": {
+            "portfolio_nav": pd.Series([1.0, 1.01, 1.01], index=index),
+        }
+    }
+
+    table = build_rebalance_reason_table(
+        strategy_name="balanced",
+        strategy_result=strategy_result,
+        benchmark_results=benchmark_results,
+    )
+
+    assert table.index.name == "date"
+    assert table.columns.tolist() == ["balanced", "benchmark_a"]
+    assert table["balanced"].tolist() == ["none", "none", "none"]
+    assert table["benchmark_a"].tolist() == ["none", "none", "none"]
+
+
+def test_build_rebalance_reason_table_prefers_explicit_rebalance_reason_series() -> None:
+    index = pd.to_datetime(["2024-01-02", "2024-01-03"])
+    strategy_result = {
+        "rebalance_reasons": pd.Series(["initial", "calendar"], index=index),
+        "portfolio_returns": pd.Series([0.0, 0.0], index=index),
+    }
+    benchmark_results = {
+        "benchmark_a": {
+            "rebalance_reasons": pd.Series(["none", "drift"], index=index),
+            "portfolio_returns": pd.Series([0.0, 0.0], index=index),
+        }
+    }
+
+    table = build_rebalance_reason_table(
+        strategy_name="balanced",
+        strategy_result=strategy_result,
+        benchmark_results=benchmark_results,
+    )
+
+    assert table["balanced"].tolist() == ["initial", "calendar"]
+    assert table["benchmark_a"].tolist() == ["none", "drift"]
 
 
 def test_build_summary_tables_and_write_outputs() -> None:
