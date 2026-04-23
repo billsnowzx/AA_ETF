@@ -150,6 +150,69 @@ Current Phase 1 config note:
 
 - The international aggregate bond slot uses `BNDX` in the live config so the default universe can satisfy the current liquidity screen in strict mode.
 
+## Operations
+
+Use these commands for repeatable day-to-day operation.
+
+### 1) Full Phase 1 run (pipeline + dashboard generation)
+
+```bash
+python scripts/run_phase1.py --start 2020-01-01 --end 2024-12-31
+```
+
+This runs:
+
+- `run_pipeline.py` with output validation (`--fail-on-missing-outputs --fail-on-empty-outputs`)
+- static dashboard generation to `outputs/reports/dashboard.html`
+
+### 2) Deterministic run metadata
+
+```bash
+python scripts/run_phase1.py --start 2020-01-01 --end 2024-12-31 --as-of-date 2024-12-31 --seed 7
+```
+
+This records deterministic metadata in `outputs/tables/pipeline_manifest.json` under:
+
+- `parameters.as_of_date`
+- `parameters.seed`
+
+### 3) Run tests
+
+```bash
+python -m pytest -q
+```
+
+### 4) No-network smoke test (fixture-based)
+
+```bash
+python -m pytest tests/test_smoke_phase1_fixture.py -q
+```
+
+### 5) Validate required output artifacts
+
+```bash
+python scripts/check_required_outputs.py --table-dir outputs/tables --figure-dir outputs/figures --report-dir outputs/reports
+```
+
+This fails if required tables/figures/reports are missing or empty.
+
+### 6) Launch dashboard server
+
+```bash
+python -m src.dashboard.app --host 127.0.0.1 --port 8000
+```
+
+### Troubleshooting
+
+- `Config schema validation failed`:
+  Check YAML structure in `config/etf_universe.yaml`, `config/portfolio_templates.yaml`, `config/benchmark_config.yaml`, and `config/rebalance_rules.yaml`.
+- `Output inventory validation failed; missing artifacts`:
+  Re-run pipeline with `--fail-on-missing-outputs` and inspect `outputs/tables/output_inventory.csv`.
+- `Output inventory validation failed; empty artifacts`:
+  Re-run pipeline with `--fail-on-empty-outputs` and inspect generated file sizes in `output_inventory.csv`.
+- Dashboard opens but shows missing sections:
+  Ensure pipeline completed first and that `outputs/tables/*.csv` plus `outputs/figures/*.png` exist.
+
 ## Example usage
 
 ```python

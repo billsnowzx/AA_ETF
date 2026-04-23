@@ -20,12 +20,16 @@ def test_argument_parser_exposes_rolling_window_default_and_override() -> None:
     default_args = parser.parse_args(["--start", "2024-01-01"])
     override_args = parser.parse_args(["--start", "2024-01-01", "--rolling-window", "21"])
     fail_args = parser.parse_args(["--start", "2024-01-01", "--fail-on-missing-outputs"])
+    deterministic_args = parser.parse_args(["--start", "2024-01-01", "--as-of-date", "2024-12-31", "--seed", "7"])
 
     assert default_args.rolling_window == 63
     assert default_args.risk_limits_config == "config/risk_limits.yaml"
     assert default_args.fail_on_missing_outputs is False
+    assert default_args.fail_on_empty_outputs is False
     assert override_args.rolling_window == 21
     assert fail_args.fail_on_missing_outputs is True
+    assert deterministic_args.as_of_date == "2024-12-31"
+    assert deterministic_args.seed == 7
 
 
 def test_save_processed_frames_writes_per_ticker_csv() -> None:

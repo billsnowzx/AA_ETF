@@ -14,6 +14,7 @@ from run_pipeline import (
     build_trend_filter_overlay_settings,
     build_backtest_policy_tables,
     find_missing_output_inventory_entries,
+    find_empty_output_inventory_entries,
     build_output_inventory,
     build_performance_summary,
     build_pipeline_manifest,
@@ -357,6 +358,8 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         figure_dir="outputs/figures",
         report_dir="outputs/reports",
         run_completed_at="2026-04-20T00:00:00+00:00",
+        as_of_date="2024-12-31",
+        seed=7,
     )
 
     output_dir = Path("data/cache") / f"test_manifest_{uuid.uuid4().hex}"
@@ -367,6 +370,8 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         assert loaded["parameters"]["rolling_window"] == 21
         assert loaded["parameters"]["template_name"] == "balanced"
         assert loaded["parameters"]["backtest_universe_mode"] == "liquidity_filtered"
+        assert loaded["parameters"]["as_of_date"] == "2024-12-31"
+        assert loaded["parameters"]["seed"] == 7
         assert loaded["config_files"]["universe"] == "config\\etf_universe.yaml"
         assert loaded["config_files"]["risk_limits"] == "config\\risk_limits.yaml"
         assert loaded["universes"]["backtest_tickers"] == ["VTI", "AGG"]
@@ -501,3 +506,19 @@ def test_find_missing_output_inventory_entries_returns_only_missing_rows() -> No
     assert len(missing) == 2
     assert missing["name"].tolist() == ["balanced_phase1_report", "nav_chart"]
     assert missing["size_bytes"].tolist() == [0, 0]
+
+
+def test_find_empty_output_inventory_entries_returns_only_existing_empty_rows() -> None:
+    inventory = pd.DataFrame(
+        [
+            {"output_type": "table", "name": "performance_summary", "path": "a.csv", "exists": True, "size_bytes": 10},
+            {"output_type": "report", "name": "balanced_phase1_report", "path": "b.md", "exists": True, "size_bytes": 0},
+            {"output_type": "figure", "name": "nav_chart", "path": "c.png", "exists": False, "size_bytes": 0},
+        ]
+    )
+
+    empty = find_empty_output_inventory_entries(inventory)
+
+    assert len(empty) == 1
+    assert empty["name"].tolist() == ["balanced_phase1_report"]
+    assert empty["size_bytes"].tolist() == [0]

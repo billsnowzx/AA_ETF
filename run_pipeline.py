@@ -5,8 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import random
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from src.analytics.correlation import (
@@ -48,6 +50,8 @@ from src.universe.etf_scoring import score_etf_universe
 from src.universe.liquidity_filter import filter_liquid_universe
 from src.universe.universe_builder import load_enabled_universe
 from src.utils.dates import validate_date_range
+from src.utils.dates import parse_date
+from src.utils.config_schema import validate_phase1_config_files
 from src.utils.logger import configure_logging
 
 LOGGER = logging.getLogger(__name__)
@@ -647,6 +651,15 @@ def find_missing_output_inventory_entries(inventory: pd.DataFrame) -> pd.DataFra
     return inventory.loc[~exists_mask].reset_index(drop=True)
 
 
+def find_empty_output_inventory_entries(inventory: pd.DataFrame) -> pd.DataFrame:
+    """Return output inventory rows where artifacts exist but are empty (size <= 0)."""
+    if inventory.empty or "exists" not in inventory.columns or "size_bytes" not in inventory.columns:
+        return pd.DataFrame(columns=inventory.columns)
+    exists_mask = inventory["exists"].astype(bool)
+    size_mask = pd.to_numeric(inventory["size_bytes"], errors="coerce").fillna(0) <= 0
+    return inventory.loc[exists_mask & size_mask].reset_index(drop=True)
+
+
 def build_pipeline_manifest(
     *,
     start: str,
@@ -669,6 +682,8 @@ def build_pipeline_manifest(
     figure_dir: str | Path,
     report_dir: str | Path,
     run_completed_at: str | None = None,
+    as_of_date: str | None = None,
+    seed: int | None = None,
 ) -> dict:
     """Build a reproducibility manifest for a completed Phase 1 pipeline run."""
     completed_at = run_completed_at or pd.Timestamp.utcnow().isoformat()
@@ -683,6 +698,8 @@ def build_pipeline_manifest(
             "backtest_universe_mode": backtest_universe_mode,
             "rolling_window": rolling_window,
             "template_name": template_name,
+            "as_of_date": as_of_date,
+            "seed": seed,
         },
         "config_files": {
             name: str(Path(path))
@@ -758,6 +775,22 @@ def build_argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Raise an error when output inventory reports missing artifacts.",
     )
+    parser.add_argument(
+        "--fail-on-empty-outputs",
+        action="store_true",
+        help="Raise an error when output inventory reports empty artifacts (size <= 0).",
+    )
+    parser.add_argument(
+        "--as-of-date",
+        default=None,
+        help="Optional deterministic run date (YYYY-MM-DD) recorded in the manifest.",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Optional random seed for deterministic runs.",
+    )
     parser.add_argument("--log-level", default="INFO")
     return parser
 
@@ -769,6 +802,20 @@ def main() -> None:
 
     configure_logging(args.log_level)
     args.start, args.end = validate_date_range(args.start, args.end)
+    if args.as_of_date is not None:
+        as_of_ts = parse_date(args.as_of_date)
+        args.as_of_date = as_of_ts.strftime("%Y-%m-%d")
+
+    validate_phase1_config_files(
+        universe_config_path=args.universe_config,
+        portfolio_config_path=args.portfolio_config,
+        benchmark_config_path=args.benchmark_config,
+        rebalance_config_path=args.rebalance_config,
+    )
+
+    if args.seed is not None:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
 
     tickers = load_enabled_tickers(args.universe_config)
     LOGGER.info("Loaded %s enabled tickers from %s", len(tickers), args.universe_config)
@@ -958,6 +1005,8 @@ def main() -> None:
         processed_dir=args.processed_dir,
         figure_dir=args.figure_dir,
         report_dir=args.report_dir,
+        as_of_date=args.as_of_date,
+        seed=args.seed,
     )
     write_pipeline_manifest(manifest, args.output_dir)
     output_inventory = build_output_inventory(
@@ -968,6 +1017,7 @@ def main() -> None:
     )
     inventory_path = write_output_inventory(output_inventory, args.output_dir)
     missing_outputs = find_missing_output_inventory_entries(output_inventory)
+    empty_outputs = find_empty_output_inventory_entries(output_inventory)
     if not missing_outputs.empty:
         missing_labels = ", ".join(
             f"{row.output_type}:{row.name}"
@@ -979,6 +1029,17 @@ def main() -> None:
                 + missing_labels
             )
         LOGGER.warning("Output inventory found missing artifacts: %s", missing_labels)
+    if not empty_outputs.empty:
+        empty_labels = ", ".join(
+            f"{row.output_type}:{row.name}"
+            for row in empty_outputs.itertuples(index=False)
+        )
+        if args.fail_on_empty_outputs:
+            raise RuntimeError(
+                "Output inventory validation failed; empty artifacts: "
+                + empty_labels
+            )
+        LOGGER.warning("Output inventory found empty artifacts: %s", empty_labels)
 
     final_table_paths = collect_table_output_paths(args.output_dir)
     final_table_paths["output_inventory"] = inventory_path
@@ -1002,6 +1063,8 @@ def main() -> None:
         processed_dir=args.processed_dir,
         figure_dir=args.figure_dir,
         report_dir=args.report_dir,
+        as_of_date=args.as_of_date,
+        seed=args.seed,
     )
     write_pipeline_manifest(manifest, args.output_dir)
 
