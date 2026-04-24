@@ -284,6 +284,7 @@ def build_dashboard_html(
     run_configuration = _read_csv_if_exists(output_path / "run_configuration.csv")
     output_inventory = _read_csv_if_exists(output_path / "output_inventory.csv", index_col=None)
     pipeline_health_summary = _read_csv_if_exists(output_path / "pipeline_health_summary.csv")
+    macro_observation_summary = _read_csv_if_exists(output_path / "macro_observation_summary.csv")
     rolling_volatility = _read_csv_if_exists(output_path / "rolling_volatility.csv")
     rolling_sharpe = _read_csv_if_exists(output_path / "rolling_sharpe.csv")
     manifest_summary = _build_manifest_summary(_read_json_if_exists(output_path / "pipeline_manifest.json"))
@@ -307,6 +308,7 @@ def build_dashboard_html(
             "run_configuration": run_configuration,
             "output_inventory": output_inventory,
             "pipeline_health_summary": pipeline_health_summary,
+            "macro_observation_summary": macro_observation_summary.tail(5),
             "rolling_volatility": rolling_volatility.tail(5),
             "rolling_sharpe": rolling_sharpe.tail(5),
             "manifest_summary": manifest_summary,
@@ -330,6 +332,7 @@ def build_dashboard_html(
     run_configuration = formatted_tables["run_configuration"]
     output_inventory = formatted_tables["output_inventory"]
     pipeline_health_summary = formatted_tables["pipeline_health_summary"]
+    macro_observation_summary = formatted_tables["macro_observation_summary"]
     rolling_volatility = formatted_tables["rolling_volatility"]
     rolling_sharpe = formatted_tables["rolling_sharpe"]
     manifest_summary = formatted_tables["manifest_summary"]
@@ -465,6 +468,10 @@ def build_dashboard_html(
       <section class="card">
         <h2>Pipeline Health</h2>
         {dataframe_to_html_table(pipeline_health_summary)}
+      </section>
+      <section class="card">
+        <h2>Latest Macro Observations</h2>
+        {dataframe_to_html_table(macro_observation_summary)}
       </section>
       <section class="card">
         <h2>Performance Summary</h2>

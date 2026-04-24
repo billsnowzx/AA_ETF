@@ -22,6 +22,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--raw-dir", default="data/raw")
     parser.add_argument("--processed-dir", default="data/processed")
+    parser.add_argument("--macro-dir", default="data/macro")
     parser.add_argument("--output-dir", default="outputs/tables")
     parser.add_argument("--figure-dir", default="outputs/figures")
     parser.add_argument("--report-dir", default="outputs/reports")
@@ -49,6 +50,8 @@ def main() -> None:
         args.raw_dir,
         "--processed-dir",
         args.processed_dir,
+        "--macro-dir",
+        args.macro_dir,
         "--output-dir",
         args.output_dir,
         "--figure-dir",

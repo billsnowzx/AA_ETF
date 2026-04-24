@@ -151,6 +151,10 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
             },
             index=pd.Index(["health"], name="scope"),
         ).to_csv(table_dir / "pipeline_health_summary.csv")
+        pd.DataFrame(
+            {"us10y_yield": [4.2], "vix": [15.0]},
+            index=pd.Index(["2024-01-02"], name="date"),
+        ).to_csv(table_dir / "macro_observation_summary.csv")
         (table_dir / "pipeline_manifest.json").write_text(
             json.dumps(
                 {
@@ -188,6 +192,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "config\\risk_limits.yaml" in html
         assert "Output Inventory" in html
         assert "Pipeline Health" in html
+        assert "Latest Macro Observations" in html
         assert "performance_summary" in html
         assert "liquidity_filtered" in html
         assert "risk_limits_has_breach" in html

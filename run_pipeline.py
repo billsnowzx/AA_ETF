@@ -22,6 +22,7 @@ from src.analytics.drawdown import drawdown_from_returns
 from src.analytics.risk import risk_contribution_table, rolling_sharpe_ratio, rolling_volatility
 from src.backtest.engine import run_fixed_weight_backtest
 from src.data.clean_data import batch_clean_price_frames, build_data_quality_summary
+from src.data.fetch_macro_data import fetch_macro_series, save_macro_series_per_symbol
 from src.data.fetch_prices import fetch_prices
 from src.dashboard.plots import write_phase1_chart_outputs
 from src.dashboard.reporting import (
@@ -191,6 +192,19 @@ def write_data_quality_outputs(
     data_quality_summary.to_csv(data_quality_path, index=True)
     LOGGER.info("Saved data quality summary to %s", data_quality_path)
     return data_quality_summary
+
+
+def write_macro_outputs(
+    macro_series: pd.DataFrame,
+    output_dir: str | Path,
+) -> Path:
+    """Persist macro observation summary for pipeline reporting and dashboarding."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    macro_path = output_path / "macro_observation_summary.csv"
+    macro_series.to_csv(macro_path, index=True)
+    LOGGER.info("Saved macro observation summary to %s", macro_path)
+    return macro_path
 
 
 def run_strategy_backtests(
@@ -872,6 +886,7 @@ def build_pipeline_manifest(
     output_dir: str | Path,
     raw_dir: str | Path,
     processed_dir: str | Path,
+    macro_dir: str | Path,
     figure_dir: str | Path,
     report_dir: str | Path,
     run_completed_at: str | None = None,
@@ -934,6 +949,7 @@ def build_pipeline_manifest(
         "directories": {
             "raw": str(Path(raw_dir)),
             "processed": str(Path(processed_dir)),
+            "macro": str(Path(macro_dir)),
             "tables": str(Path(output_dir)),
             "figures": str(Path(figure_dir)),
             "reports": str(Path(report_dir)),
@@ -969,6 +985,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--end", default=None, help="Exclusive end date in YYYY-MM-DD format.")
     parser.add_argument("--raw-dir", default="data/raw")
     parser.add_argument("--processed-dir", default="data/processed")
+    parser.add_argument("--macro-dir", default="data/macro")
     parser.add_argument("--output-dir", default="outputs/tables")
     parser.add_argument("--figure-dir", default="outputs/figures")
     parser.add_argument("--report-dir", default="outputs/reports")
@@ -1050,6 +1067,9 @@ def main() -> None:
     clean_frames = batch_clean_price_frames(raw_frames)
     save_processed_frames(clean_frames, args.processed_dir)
     data_quality_summary = write_data_quality_outputs(clean_frames, args.output_dir)
+    macro_series = fetch_macro_series(start=args.start, end=args.end)
+    save_macro_series_per_symbol(macro_series, output_dir=args.macro_dir)
+    macro_summary_path = write_macro_outputs(macro_series, args.output_dir)
 
     liquid_tickers, liquidity_table = filter_liquid_universe(clean_frames)
     etf_summary = score_etf_universe(args.universe_config, liquidity_table)
@@ -1256,6 +1276,7 @@ def main() -> None:
         output_dir=args.output_dir,
         raw_dir=args.raw_dir,
         processed_dir=args.processed_dir,
+        macro_dir=args.macro_dir,
         figure_dir=args.figure_dir,
         report_dir=args.report_dir,
         as_of_date=args.as_of_date,
@@ -1366,6 +1387,7 @@ def main() -> None:
         LOGGER.warning("Output inventory found empty artifacts: %s", empty_labels)
 
     final_table_paths = collect_table_output_paths(args.output_dir)
+    final_table_paths["macro_observation_summary"] = macro_summary_path
     final_table_paths["output_inventory"] = inventory_path
     final_table_paths["pipeline_health_summary"] = pipeline_health_summary_path
     final_table_paths["risk_limit_checks"] = risk_limit_path
@@ -1389,6 +1411,7 @@ def main() -> None:
         output_dir=args.output_dir,
         raw_dir=args.raw_dir,
         processed_dir=args.processed_dir,
+        macro_dir=args.macro_dir,
         figure_dir=args.figure_dir,
         report_dir=args.report_dir,
         as_of_date=args.as_of_date,

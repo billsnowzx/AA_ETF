@@ -11,6 +11,7 @@ from run_pipeline import (
     save_processed_frames,
     write_data_quality_outputs,
     write_liquidity_outputs,
+    write_macro_outputs,
 )
 
 
@@ -25,6 +26,7 @@ def test_argument_parser_exposes_rolling_window_default_and_override() -> None:
 
     assert default_args.rolling_window == 63
     assert default_args.risk_limits_config == "config/risk_limits.yaml"
+    assert default_args.macro_dir == "data/macro"
     assert default_args.fail_on_missing_outputs is False
     assert default_args.fail_on_empty_outputs is False
     assert override_args.rolling_window == 21
@@ -61,6 +63,24 @@ def test_write_data_quality_outputs_writes_summary_file() -> None:
         summary = write_data_quality_outputs({"VTI": frame}, output_dir)
         assert (output_dir / "data_quality_summary.csv").exists()
         assert summary.loc["VTI", "observations"] == 1
+    finally:
+        shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_write_macro_outputs_writes_summary_file() -> None:
+    output_dir = Path("data/cache") / f"test_macro_outputs_{uuid.uuid4().hex}"
+    macro = pd.DataFrame(
+        {"us10y_yield": [4.2], "vix": [15.0]},
+        index=pd.to_datetime(["2024-01-02"]),
+    )
+    macro.index.name = "date"
+
+    try:
+        path = write_macro_outputs(macro, output_dir)
+        assert path.exists()
+        loaded = pd.read_csv(path, index_col=0)
+        assert "us10y_yield" in loaded.columns
+        assert "vix" in loaded.columns
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
 
@@ -125,6 +145,12 @@ def test_main_fail_on_missing_outputs_raises_runtime_error(monkeypatch) -> None:
         "run_pipeline.write_data_quality_outputs",
         lambda *args, **kwargs: pd.DataFrame({"observations": [2]}, index=pd.Index(["VTI"], name="ticker")),
     )
+    monkeypatch.setattr(
+        "run_pipeline.fetch_macro_series",
+        lambda *args, **kwargs: pd.DataFrame({"vix": [15.0]}, index=index[:1]),
+    )
+    monkeypatch.setattr("run_pipeline.save_macro_series_per_symbol", lambda *args, **kwargs: {})
+    monkeypatch.setattr("run_pipeline.write_macro_outputs", lambda *args, **kwargs: Path("outputs/tables/macro_observation_summary.csv"))
     monkeypatch.setattr(
         "run_pipeline.filter_liquid_universe",
         lambda *args, **kwargs: (
@@ -327,6 +353,12 @@ def test_main_passes_rebalance_reason_table_to_reports(monkeypatch) -> None:
         "run_pipeline.write_data_quality_outputs",
         lambda *args, **kwargs: pd.DataFrame({"observations": [2]}, index=pd.Index(["VTI"], name="ticker")),
     )
+    monkeypatch.setattr(
+        "run_pipeline.fetch_macro_series",
+        lambda *args, **kwargs: pd.DataFrame({"vix": [15.0]}, index=index[:1]),
+    )
+    monkeypatch.setattr("run_pipeline.save_macro_series_per_symbol", lambda *args, **kwargs: {})
+    monkeypatch.setattr("run_pipeline.write_macro_outputs", lambda *args, **kwargs: Path("outputs/tables/macro_observation_summary.csv"))
     monkeypatch.setattr(
         "run_pipeline.filter_liquid_universe",
         lambda *args, **kwargs: (
@@ -535,6 +567,12 @@ def test_main_fail_on_risk_limit_breach_raises_runtime_error(monkeypatch) -> Non
         "run_pipeline.write_data_quality_outputs",
         lambda *args, **kwargs: pd.DataFrame({"observations": [2]}, index=pd.Index(["VTI"], name="ticker")),
     )
+    monkeypatch.setattr(
+        "run_pipeline.fetch_macro_series",
+        lambda *args, **kwargs: pd.DataFrame({"vix": [15.0]}, index=index[:1]),
+    )
+    monkeypatch.setattr("run_pipeline.save_macro_series_per_symbol", lambda *args, **kwargs: {})
+    monkeypatch.setattr("run_pipeline.write_macro_outputs", lambda *args, **kwargs: Path("outputs/tables/macro_observation_summary.csv"))
     monkeypatch.setattr(
         "run_pipeline.filter_liquid_universe",
         lambda *args, **kwargs: (

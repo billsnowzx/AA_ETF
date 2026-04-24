@@ -71,8 +71,9 @@ D:\AI\AAETF
 1. Load the ETF universe from YAML.
 2. Download per-ticker raw OHLCV data with [`src/data/fetch_prices.py`](D:/AI/AAETF/src/data/fetch_prices.py).
 3. Clean and validate the raw frames with [`src/data/clean_data.py`](D:/AI/AAETF/src/data/clean_data.py).
-4. Compute returns and annualized metrics with [`src/analytics/returns.py`](D:/AI/AAETF/src/analytics/returns.py).
-5. Generate liquidity audit tables and a filtered universe with [`src/universe/liquidity_filter.py`](D:/AI/AAETF/src/universe/liquidity_filter.py).
+4. Fetch macro monitoring series with [`src/data/fetch_macro_data.py`](D:/AI/AAETF/src/data/fetch_macro_data.py).
+5. Compute returns and annualized metrics with [`src/analytics/returns.py`](D:/AI/AAETF/src/analytics/returns.py).
+6. Generate liquidity audit tables and a filtered universe with [`src/universe/liquidity_filter.py`](D:/AI/AAETF/src/universe/liquidity_filter.py).
 
 Raw prices are stored as one CSV per ticker under `data/raw/` to keep the pipeline easy to inspect and audit manually.
 
@@ -104,6 +105,7 @@ This command will:
 
 - download per-ticker raw prices into `data/raw/`
 - save cleaned per-ticker data into `data/processed/`
+- download macro series into `data/macro/` and write `outputs/tables/macro_observation_summary.csv`
 - generate `outputs/tables/liquidity_summary.csv`
 - generate `outputs/tables/etf_summary.csv`
 - generate `outputs/tables/data_quality_summary.csv`
