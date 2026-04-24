@@ -66,3 +66,26 @@ def test_save_macro_series_per_symbol_writes_csvs() -> None:
         assert "vix" in saved
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_fetch_macro_series_retries_failed_downloads(monkeypatch) -> None:
+    calls = {"count": 0}
+
+    def fake_download(**kwargs) -> pd.DataFrame:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return pd.DataFrame()
+        return _sample_download_frame()
+
+    monkeypatch.setattr("src.data.fetch_macro_data.yf.download", fake_download)
+
+    macro = fetch_macro_series(
+        start="2024-01-01",
+        end="2024-01-31",
+        series_map={"vix": "^VIX"},
+        max_retries=2,
+        retry_delay_seconds=0.0,
+    )
+
+    assert calls["count"] == 2
+    assert "vix" in macro.columns

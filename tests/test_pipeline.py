@@ -27,6 +27,8 @@ def test_argument_parser_exposes_rolling_window_default_and_override() -> None:
     assert default_args.rolling_window == 63
     assert default_args.risk_limits_config == "config/risk_limits.yaml"
     assert default_args.macro_dir == "data/macro"
+    assert default_args.download_retries == 3
+    assert default_args.download_retry_delay == 1.0
     assert default_args.fail_on_missing_outputs is False
     assert default_args.fail_on_empty_outputs is False
     assert override_args.rolling_window == 21

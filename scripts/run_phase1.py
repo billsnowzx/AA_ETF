@@ -26,6 +26,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", default="outputs/tables")
     parser.add_argument("--figure-dir", default="outputs/figures")
     parser.add_argument("--report-dir", default="outputs/reports")
+    parser.add_argument("--download-retries", type=int, default=3)
+    parser.add_argument("--download-retry-delay", type=float, default=1.0)
     parser.add_argument("--log-level", default="INFO")
     return parser
 
@@ -58,6 +60,10 @@ def main() -> None:
         args.figure_dir,
         "--report-dir",
         args.report_dir,
+        "--download-retries",
+        str(args.download_retries),
+        "--download-retry-delay",
+        str(args.download_retry_delay),
         "--fail-on-missing-outputs",
         "--fail-on-empty-outputs",
         "--log-level",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Iterable
 
@@ -60,21 +61,47 @@ def fetch_price_history(
     ticker: str,
     start: str | None = None,
     end: str | None = None,
+    max_retries: int = 3,
+    retry_delay_seconds: float = 1.0,
 ) -> pd.DataFrame:
     """Fetch and standardize daily OHLCV data for a single ticker."""
     start, end = validate_date_range(start, end)
     cache_path = configure_yfinance_tz_cache()
     LOGGER.debug("Configured yfinance timezone cache path: %s", cache_path)
-    LOGGER.info("Downloading price data for %s", ticker)
-    raw_frame = yf.download(
-        tickers=ticker,
-        start=start,
-        end=end,
-        auto_adjust=False,
-        progress=False,
-        actions=False,
-    )
-    frame = _standardize_download_frame(raw_frame, ticker=ticker)
+    if max_retries < 1:
+        raise ValueError("max_retries must be >= 1.")
+    if retry_delay_seconds < 0:
+        raise ValueError("retry_delay_seconds must be >= 0.")
+
+    last_error: Exception | None = None
+    for attempt in range(1, max_retries + 1):
+        LOGGER.info("Downloading price data for %s (attempt %s/%s)", ticker, attempt, max_retries)
+        raw_frame = yf.download(
+            tickers=ticker,
+            start=start,
+            end=end,
+            auto_adjust=False,
+            progress=False,
+            actions=False,
+        )
+        try:
+            frame = _standardize_download_frame(raw_frame, ticker=ticker)
+            break
+        except ValueError as exc:
+            last_error = exc
+            if attempt >= max_retries:
+                raise
+            LOGGER.warning(
+                "Download attempt failed for %s (%s). Retrying in %.1f seconds.",
+                ticker,
+                exc,
+                retry_delay_seconds,
+            )
+            time.sleep(retry_delay_seconds)
+    else:
+        if last_error is not None:
+            raise last_error
+        raise ValueError(f"No price data returned for ticker '{ticker}'.")
 
     if frame["adj_close"].isna().any():
         missing_count = int(frame["adj_close"].isna().sum())
@@ -96,6 +123,8 @@ def fetch_prices(
     end: str | None = None,
     output_dir: str | Path = "data/raw",
     save_raw: bool = True,
+    max_retries: int = 3,
+    retry_delay_seconds: float = 1.0,
 ) -> dict[str, pd.DataFrame]:
     """Fetch and optionally persist price history for multiple tickers."""
     start, end = validate_date_range(start, end)
@@ -103,7 +132,13 @@ def fetch_prices(
     frames: dict[str, pd.DataFrame] = {}
 
     for ticker in tickers:
-        frame = fetch_price_history(ticker=ticker, start=start, end=end)
+        frame = fetch_price_history(
+            ticker=ticker,
+            start=start,
+            end=end,
+            max_retries=max_retries,
+            retry_delay_seconds=retry_delay_seconds,
+        )
         frames[ticker] = frame
         if save_raw:
             save_price_frame(frame, output_path / f"{ticker}.csv")

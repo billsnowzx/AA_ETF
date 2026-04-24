@@ -68,6 +68,24 @@ def test_fetch_prices_saves_per_ticker_csv(monkeypatch) -> None:
         shutil.rmtree(output_dir, ignore_errors=True)
 
 
+def test_fetch_price_history_retries_after_empty_response(monkeypatch) -> None:
+    calls = {"count": 0}
+
+    def fake_download(**kwargs) -> pd.DataFrame:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return pd.DataFrame()
+        return _sample_download_frame()
+
+    monkeypatch.setattr("src.data.fetch_prices.yf.download", fake_download)
+
+    frame = fetch_price_history("VTI", max_retries=2, retry_delay_seconds=0.0)
+
+    assert calls["count"] == 2
+    assert not frame.empty
+    assert frame["ticker"].iloc[0] == "VTI"
+
+
 def test_configure_yfinance_tz_cache_uses_workspace_path(monkeypatch) -> None:
     captured: dict[str, str] = {}
 

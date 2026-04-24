@@ -990,6 +990,18 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--figure-dir", default="outputs/figures")
     parser.add_argument("--report-dir", default="outputs/reports")
     parser.add_argument(
+        "--download-retries",
+        type=int,
+        default=3,
+        help="Maximum retry attempts for yfinance downloads.",
+    )
+    parser.add_argument(
+        "--download-retry-delay",
+        type=float,
+        default=1.0,
+        help="Delay in seconds between yfinance retry attempts.",
+    )
+    parser.add_argument(
         "--rolling-window",
         type=int,
         default=63,
@@ -1063,11 +1075,18 @@ def main() -> None:
         end=args.end,
         output_dir=args.raw_dir,
         save_raw=True,
+        max_retries=args.download_retries,
+        retry_delay_seconds=args.download_retry_delay,
     )
     clean_frames = batch_clean_price_frames(raw_frames)
     save_processed_frames(clean_frames, args.processed_dir)
     data_quality_summary = write_data_quality_outputs(clean_frames, args.output_dir)
-    macro_series = fetch_macro_series(start=args.start, end=args.end)
+    macro_series = fetch_macro_series(
+        start=args.start,
+        end=args.end,
+        max_retries=args.download_retries,
+        retry_delay_seconds=args.download_retry_delay,
+    )
     save_macro_series_per_symbol(macro_series, output_dir=args.macro_dir)
     macro_summary_path = write_macro_outputs(macro_series, args.output_dir)
 

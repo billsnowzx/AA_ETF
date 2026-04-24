@@ -101,6 +101,12 @@ The rolling volatility and rolling Sharpe outputs use a 63-trading-day window by
 python run_pipeline.py --start 2020-01-01 --end 2024-12-31 --rolling-window 21
 ```
 
+To increase download resilience when `yfinance` is unstable:
+
+```bash
+python run_pipeline.py --start 2020-01-01 --end 2024-12-31 --download-retries 5 --download-retry-delay 2
+```
+
 This command will:
 
 - download per-ticker raw prices into `data/raw/`

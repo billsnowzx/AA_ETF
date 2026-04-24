@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -48,27 +49,56 @@ def fetch_macro_series(
     start: str | None = None,
     end: str | None = None,
     series_map: dict[str, str] | None = None,
+    max_retries: int = 3,
+    retry_delay_seconds: float = 1.0,
 ) -> pd.DataFrame:
     """Fetch macro observation series and return a wide DataFrame by canonical series name."""
     start, end = validate_date_range(start, end)
     active_map = series_map.copy() if series_map is not None else DEFAULT_MACRO_SERIES_MAP.copy()
     configure_yfinance_tz_cache()
+    if max_retries < 1:
+        raise ValueError("max_retries must be >= 1.")
+    if retry_delay_seconds < 0:
+        raise ValueError("retry_delay_seconds must be >= 0.")
 
     result: dict[str, pd.Series] = {}
     for series_name, symbol in active_map.items():
-        LOGGER.info("Downloading macro data for %s (%s)", series_name, symbol)
-        raw_frame = yf.download(
-            tickers=symbol,
-            start=start,
-            end=end,
-            auto_adjust=False,
-            progress=False,
-            actions=False,
-        )
-        try:
-            series = _standardize_macro_download_frame(raw_frame, symbol=symbol)
-        except ValueError as exc:
-            LOGGER.warning("Skipping macro series %s due to download issue: %s", series_name, exc)
+        series: pd.Series | None = None
+        last_error: Exception | None = None
+        for attempt in range(1, max_retries + 1):
+            LOGGER.info(
+                "Downloading macro data for %s (%s), attempt %s/%s",
+                series_name,
+                symbol,
+                attempt,
+                max_retries,
+            )
+            raw_frame = yf.download(
+                tickers=symbol,
+                start=start,
+                end=end,
+                auto_adjust=False,
+                progress=False,
+                actions=False,
+            )
+            try:
+                series = _standardize_macro_download_frame(raw_frame, symbol=symbol)
+                break
+            except ValueError as exc:
+                last_error = exc
+                if attempt >= max_retries:
+                    LOGGER.warning("Skipping macro series %s due to download issue: %s", series_name, exc)
+                    break
+                LOGGER.warning(
+                    "Download attempt failed for macro series %s (%s). Retrying in %.1f seconds.",
+                    series_name,
+                    exc,
+                    retry_delay_seconds,
+                )
+                time.sleep(retry_delay_seconds)
+        if series is None:
+            if last_error is not None:
+                LOGGER.debug("Macro series %s final failure: %s", series_name, last_error)
             continue
         series.name = series_name
         result[series_name] = series
@@ -98,4 +128,3 @@ def save_macro_series_per_symbol(
         macro_series[[column]].to_csv(path, index=True)
         saved[column] = path
     return saved
-
