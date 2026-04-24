@@ -655,6 +655,32 @@ def validate_risk_limit_artifacts(
             f"{sorted(missing_columns)}."
         )
 
+    for portfolio, summary_row in risk_limit_breach_summary.iterrows():
+        total_enabled = int(float(summary_row["total_enabled_checks"]))
+        breached = int(float(summary_row["breached_checks"]))
+        breach_ratio = float(summary_row["breach_ratio"])
+        if total_enabled < 0 or breached < 0:
+            raise ValueError(
+                "Risk-limit artifact validation failed: total/breached checks must be non-negative for "
+                f"{portfolio}."
+            )
+        if breached > total_enabled:
+            raise ValueError(
+                "Risk-limit artifact validation failed: breached_checks cannot exceed total_enabled_checks for "
+                f"{portfolio}."
+            )
+        if breach_ratio < 0.0 or breach_ratio > 1.0:
+            raise ValueError(
+                "Risk-limit artifact validation failed: breach_ratio must be between 0 and 1 for "
+                f"{portfolio}."
+            )
+        expected_ratio = (float(breached / total_enabled) if total_enabled > 0 else 0.0)
+        if abs(breach_ratio - expected_ratio) > 1e-12:
+            raise ValueError(
+                "Risk-limit artifact validation failed: breach_ratio mismatch for "
+                f"{portfolio} ({breach_ratio} != {expected_ratio})."
+            )
+
     overall_breached_checks = int(float(risk_limit_breach_summary.loc["overall", "breached_checks"]))
     detail_breached_checks = int(len(risk_limit_breaches))
     if overall_breached_checks != detail_breached_checks:

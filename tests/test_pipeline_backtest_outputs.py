@@ -579,3 +579,41 @@ def test_validate_risk_limit_artifacts_raises_on_mismatched_counts() -> None:
         assert "overall breached_checks" in str(exc)
     else:
         raise AssertionError("Expected ValueError for mismatched risk-limit artifact counts.")
+
+
+def test_validate_risk_limit_artifacts_raises_on_invalid_ratio() -> None:
+    breaches = pd.DataFrame([{"portfolio": "balanced", "metric": "max_drawdown"}])
+    summary = pd.DataFrame(
+        {
+            "total_enabled_checks": [1, 1],
+            "breached_checks": [1, 1],
+            "breach_ratio": [2.0, 1.0],
+        },
+        index=pd.Index(["balanced", "overall"], name="portfolio"),
+    )
+
+    try:
+        validate_risk_limit_artifacts(breaches, summary)
+    except ValueError as exc:
+        assert "breach_ratio must be between 0 and 1" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for invalid breach_ratio bounds.")
+
+
+def test_validate_risk_limit_artifacts_raises_on_inconsistent_totals() -> None:
+    breaches = pd.DataFrame([{"portfolio": "balanced", "metric": "max_drawdown"}])
+    summary = pd.DataFrame(
+        {
+            "total_enabled_checks": [0, 1],
+            "breached_checks": [1, 1],
+            "breach_ratio": [1.0, 1.0],
+        },
+        index=pd.Index(["balanced", "overall"], name="portfolio"),
+    )
+
+    try:
+        validate_risk_limit_artifacts(breaches, summary)
+    except ValueError as exc:
+        assert "cannot exceed total_enabled_checks" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError when breached_checks exceeds total_enabled_checks.")
