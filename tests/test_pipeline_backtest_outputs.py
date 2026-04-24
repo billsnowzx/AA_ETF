@@ -8,6 +8,7 @@ import pandas as pd
 
 from run_pipeline import (
     build_asset_return_matrix,
+    build_pipeline_health_summary,
     build_nav_table,
     build_rebalance_reason_table,
     build_trend_filter_summary,
@@ -30,6 +31,7 @@ from run_pipeline import (
     write_backtest_outputs,
     write_output_inventory,
     write_pipeline_manifest,
+    write_pipeline_health_summary,
     write_run_configuration_output,
     write_rolling_metric_outputs,
 )
@@ -541,6 +543,36 @@ def test_find_empty_output_inventory_entries_returns_only_existing_empty_rows() 
     assert len(empty) == 1
     assert empty["name"].tolist() == ["balanced_phase1_report"]
     assert empty["size_bytes"].tolist() == [0]
+
+
+def test_build_and_write_pipeline_health_summary_records_gate_status() -> None:
+    output_dir = Path("data/cache") / f"test_pipeline_health_{uuid.uuid4().hex}"
+    missing_outputs = pd.DataFrame([{"output_type": "report", "name": "balanced_phase1_report"}])
+    empty_outputs = pd.DataFrame([{"output_type": "figure", "name": "nav_chart"}])
+    risk_limit_breaches = pd.DataFrame([{"portfolio": "balanced", "metric": "max_drawdown"}])
+
+    try:
+        summary = build_pipeline_health_summary(
+            missing_outputs=missing_outputs,
+            empty_outputs=empty_outputs,
+            risk_limit_breaches=risk_limit_breaches,
+            fail_on_missing_outputs=True,
+            fail_on_empty_outputs=False,
+            fail_on_risk_limit_breach=True,
+        )
+        output_path = write_pipeline_health_summary(summary, output_dir)
+        loaded = pd.read_csv(output_path, index_col=0)
+
+        assert output_path == output_dir / "pipeline_health_summary.csv"
+        assert int(loaded.loc["health", "missing_output_count"]) == 1
+        assert int(loaded.loc["health", "empty_output_count"]) == 1
+        assert int(loaded.loc["health", "risk_limit_breach_count"]) == 1
+        assert bool(loaded.loc["health", "would_fail_missing_outputs"]) is True
+        assert bool(loaded.loc["health", "would_fail_empty_outputs"]) is False
+        assert bool(loaded.loc["health", "would_fail_risk_limit_breach"]) is True
+        assert bool(loaded.loc["health", "run_passed_quality_gates"]) is False
+    finally:
+        shutil.rmtree(output_dir, ignore_errors=True)
 
 
 def test_validate_risk_limit_artifacts_accepts_matching_detail_and_summary() -> None:

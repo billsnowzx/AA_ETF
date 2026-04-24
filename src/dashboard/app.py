@@ -212,6 +212,16 @@ def _format_dashboard_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.Da
         if "size_bytes" in frame.columns:
             frame["size_bytes"] = frame["size_bytes"].map(_format_integer)
 
+    if "pipeline_health_summary" in formatted:
+        frame = formatted["pipeline_health_summary"]
+        for column in [
+            "missing_output_count",
+            "empty_output_count",
+            "risk_limit_breach_count",
+        ]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_integer)
+
     return formatted
 
 
@@ -259,6 +269,7 @@ def build_dashboard_html(
     rebalance_reason_summary = _read_csv_if_exists(output_path / "rebalance_reason_summary.csv")
     run_configuration = _read_csv_if_exists(output_path / "run_configuration.csv")
     output_inventory = _read_csv_if_exists(output_path / "output_inventory.csv", index_col=None)
+    pipeline_health_summary = _read_csv_if_exists(output_path / "pipeline_health_summary.csv")
     rolling_volatility = _read_csv_if_exists(output_path / "rolling_volatility.csv")
     rolling_sharpe = _read_csv_if_exists(output_path / "rolling_sharpe.csv")
     manifest_summary = _build_manifest_summary(_read_json_if_exists(output_path / "pipeline_manifest.json"))
@@ -280,6 +291,7 @@ def build_dashboard_html(
             "rebalance_reason": rebalance_reason.tail(20),
             "run_configuration": run_configuration,
             "output_inventory": output_inventory,
+            "pipeline_health_summary": pipeline_health_summary,
             "rolling_volatility": rolling_volatility.tail(5),
             "rolling_sharpe": rolling_sharpe.tail(5),
             "manifest_summary": manifest_summary,
@@ -301,6 +313,7 @@ def build_dashboard_html(
     rebalance_reason = formatted_tables["rebalance_reason"]
     run_configuration = formatted_tables["run_configuration"]
     output_inventory = formatted_tables["output_inventory"]
+    pipeline_health_summary = formatted_tables["pipeline_health_summary"]
     rolling_volatility = formatted_tables["rolling_volatility"]
     rolling_sharpe = formatted_tables["rolling_sharpe"]
     manifest_summary = formatted_tables["manifest_summary"]
@@ -430,6 +443,10 @@ def build_dashboard_html(
       <section class="card">
         <h2>Output Inventory</h2>
         {dataframe_to_html_table(output_inventory)}
+      </section>
+      <section class="card">
+        <h2>Pipeline Health</h2>
+        {dataframe_to_html_table(pipeline_health_summary)}
       </section>
       <section class="card">
         <h2>Performance Summary</h2>

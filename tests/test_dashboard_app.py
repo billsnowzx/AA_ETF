@@ -132,6 +132,15 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
                 "size_bytes": [1234],
             }
         ).to_csv(table_dir / "output_inventory.csv", index=False)
+        pd.DataFrame(
+            {
+                "missing_output_count": [0],
+                "empty_output_count": [0],
+                "risk_limit_breach_count": [1],
+                "run_passed_quality_gates": [True],
+            },
+            index=pd.Index(["health"], name="scope"),
+        ).to_csv(table_dir / "pipeline_health_summary.csv")
         (table_dir / "pipeline_manifest.json").write_text(
             json.dumps(
                 {
@@ -166,6 +175,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Run Configuration" in html
         assert "config\\risk_limits.yaml" in html
         assert "Output Inventory" in html
+        assert "Pipeline Health" in html
         assert "performance_summary" in html
         assert "liquidity_filtered" in html
         assert "risk_limits_has_breach" in html
@@ -207,6 +217,15 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
             "manifest_summary": pd.DataFrame({"value": [1.25]}, index=pd.Index(["ending_nav"])),
             "run_configuration": pd.DataFrame({"value": ["config\\risk_limits.yaml"]}, index=pd.Index(["config_risk_limits"])),
             "output_inventory": pd.DataFrame({"name": ["performance_summary"], "size_bytes": [1234]}),
+            "pipeline_health_summary": pd.DataFrame(
+                {
+                    "missing_output_count": [0],
+                    "empty_output_count": [0],
+                    "risk_limit_breach_count": [1],
+                    "run_passed_quality_gates": [True],
+                },
+                index=pd.Index(["health"]),
+            ),
             "data_quality_summary": pd.DataFrame({"observations": [2], "missing_volume": [0]}),
             "trend_filter_summary": pd.DataFrame(
                 {
@@ -271,6 +290,7 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["manifest_summary"].loc["ending_nav", "value"] == "1.2500"
     assert tables["run_configuration"].loc["config_risk_limits", "value"] == "config\\risk_limits.yaml"
     assert tables["output_inventory"].iloc[0]["size_bytes"] == "1234"
+    assert tables["pipeline_health_summary"].loc["health", "risk_limit_breach_count"] == "1"
     assert tables["data_quality_summary"].iloc[0]["observations"] == "2"
     assert tables["trend_filter_summary"].iloc[0]["trend_active_ratio"] == "66.67%"
     assert tables["trend_filter_summary"].iloc[0]["max_reduced_assets"] == "1"

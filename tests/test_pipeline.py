@@ -246,6 +246,14 @@ def test_main_fail_on_missing_outputs_raises_runtime_error(monkeypatch) -> None:
     monkeypatch.setattr("run_pipeline.build_output_inventory", lambda *args, **kwargs: pd.DataFrame())
     monkeypatch.setattr("run_pipeline.write_output_inventory", lambda *args, **kwargs: Path("outputs/tables/output_inventory.csv"))
     monkeypatch.setattr(
+        "run_pipeline.build_pipeline_health_summary",
+        lambda *args, **kwargs: pd.DataFrame({"run_passed_quality_gates": [False]}, index=pd.Index(["health"])),
+    )
+    monkeypatch.setattr(
+        "run_pipeline.write_pipeline_health_summary",
+        lambda *args, **kwargs: Path("outputs/tables/pipeline_health_summary.csv"),
+    )
+    monkeypatch.setattr(
         "run_pipeline.find_missing_output_inventory_entries",
         lambda *_args, **_kwargs: pd.DataFrame(
             [{"output_type": "report", "name": "balanced_phase1_report", "exists": False, "size_bytes": 0}]
@@ -445,6 +453,14 @@ def test_main_passes_rebalance_reason_table_to_reports(monkeypatch) -> None:
     monkeypatch.setattr("run_pipeline.write_pipeline_manifest", lambda *args, **kwargs: Path("outputs/tables/pipeline_manifest.json"))
     monkeypatch.setattr("run_pipeline.build_output_inventory", lambda *args, **kwargs: pd.DataFrame())
     monkeypatch.setattr("run_pipeline.write_output_inventory", lambda *args, **kwargs: Path("outputs/tables/output_inventory.csv"))
+    monkeypatch.setattr(
+        "run_pipeline.build_pipeline_health_summary",
+        lambda *args, **kwargs: pd.DataFrame({"run_passed_quality_gates": [True]}, index=pd.Index(["health"])),
+    )
+    monkeypatch.setattr(
+        "run_pipeline.write_pipeline_health_summary",
+        lambda *args, **kwargs: Path("outputs/tables/pipeline_health_summary.csv"),
+    )
     monkeypatch.setattr("run_pipeline.find_missing_output_inventory_entries", lambda *_args, **_kwargs: pd.DataFrame())
     monkeypatch.setattr(sys, "argv", ["run_pipeline.py", "--start", "2024-01-01"])
 
@@ -625,6 +641,14 @@ def test_main_fail_on_risk_limit_breach_raises_runtime_error(monkeypatch) -> Non
     monkeypatch.setattr("run_pipeline.write_pipeline_manifest", lambda *args, **kwargs: Path("outputs/tables/pipeline_manifest.json"))
     monkeypatch.setattr("run_pipeline.build_output_inventory", lambda *args, **kwargs: pd.DataFrame())
     monkeypatch.setattr("run_pipeline.write_output_inventory", lambda *args, **kwargs: Path("outputs/tables/output_inventory.csv"))
+    monkeypatch.setattr(
+        "run_pipeline.build_pipeline_health_summary",
+        lambda *args, **kwargs: pd.DataFrame({"run_passed_quality_gates": [False]}, index=pd.Index(["health"])),
+    )
+    monkeypatch.setattr(
+        "run_pipeline.write_pipeline_health_summary",
+        lambda *args, **kwargs: Path("outputs/tables/pipeline_health_summary.csv"),
+    )
     monkeypatch.setattr("run_pipeline.find_missing_output_inventory_entries", lambda *_args, **_kwargs: pd.DataFrame())
     monkeypatch.setattr("run_pipeline.find_empty_output_inventory_entries", lambda *_args, **_kwargs: pd.DataFrame())
     monkeypatch.setattr(

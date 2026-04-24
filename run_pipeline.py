@@ -757,6 +757,56 @@ def write_output_inventory(inventory: pd.DataFrame, output_dir: str | Path) -> P
     return inventory_path
 
 
+def build_pipeline_health_summary(
+    *,
+    missing_outputs: pd.DataFrame,
+    empty_outputs: pd.DataFrame,
+    risk_limit_breaches: pd.DataFrame,
+    fail_on_missing_outputs: bool,
+    fail_on_empty_outputs: bool,
+    fail_on_risk_limit_breach: bool,
+) -> pd.DataFrame:
+    """Build a compact pipeline health table from quality-gate diagnostics."""
+    missing_count = int(len(missing_outputs))
+    empty_count = int(len(empty_outputs))
+    risk_breach_count = int(len(risk_limit_breaches))
+    would_fail_missing = bool(fail_on_missing_outputs and missing_count > 0)
+    would_fail_empty = bool(fail_on_empty_outputs and empty_count > 0)
+    would_fail_risk = bool(fail_on_risk_limit_breach and risk_breach_count > 0)
+    run_passed_quality_gates = not (would_fail_missing or would_fail_empty or would_fail_risk)
+
+    return pd.DataFrame(
+        [
+            {
+                "missing_output_count": missing_count,
+                "empty_output_count": empty_count,
+                "risk_limit_breach_count": risk_breach_count,
+                "fail_on_missing_outputs": bool(fail_on_missing_outputs),
+                "fail_on_empty_outputs": bool(fail_on_empty_outputs),
+                "fail_on_risk_limit_breach": bool(fail_on_risk_limit_breach),
+                "would_fail_missing_outputs": would_fail_missing,
+                "would_fail_empty_outputs": would_fail_empty,
+                "would_fail_risk_limit_breach": would_fail_risk,
+                "run_passed_quality_gates": run_passed_quality_gates,
+            }
+        ],
+        index=pd.Index(["health"], name="scope"),
+    )
+
+
+def write_pipeline_health_summary(
+    health_summary: pd.DataFrame,
+    output_dir: str | Path,
+) -> Path:
+    """Persist pipeline health summary as an auditable CSV."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    health_path = output_path / "pipeline_health_summary.csv"
+    health_summary.to_csv(health_path, index=True)
+    LOGGER.info("Saved pipeline health summary to %s", health_path)
+    return health_path
+
+
 def find_missing_output_inventory_entries(inventory: pd.DataFrame) -> pd.DataFrame:
     """Return output inventory rows where expected artifacts are missing."""
     if inventory.empty or "exists" not in inventory.columns:
@@ -1185,6 +1235,17 @@ def main() -> None:
     inventory_path = write_output_inventory(output_inventory, args.output_dir)
     missing_outputs = find_missing_output_inventory_entries(output_inventory)
     empty_outputs = find_empty_output_inventory_entries(output_inventory)
+    pipeline_health_summary = build_pipeline_health_summary(
+        missing_outputs=missing_outputs,
+        empty_outputs=empty_outputs,
+        risk_limit_breaches=risk_limit_breaches,
+        fail_on_missing_outputs=args.fail_on_missing_outputs,
+        fail_on_empty_outputs=args.fail_on_empty_outputs,
+        fail_on_risk_limit_breach=args.fail_on_risk_limit_breach,
+    )
+    pipeline_health_summary_path = write_pipeline_health_summary(
+        pipeline_health_summary, args.output_dir
+    )
     if not missing_outputs.empty:
         missing_labels = ", ".join(
             f"{row.output_type}:{row.name}"
@@ -1210,6 +1271,7 @@ def main() -> None:
 
     final_table_paths = collect_table_output_paths(args.output_dir)
     final_table_paths["output_inventory"] = inventory_path
+    final_table_paths["pipeline_health_summary"] = pipeline_health_summary_path
     final_table_paths["risk_limit_checks"] = risk_limit_path
     final_table_paths["risk_limit_breaches"] = risk_limit_breaches_path
     final_table_paths["risk_limit_breach_summary"] = risk_limit_breach_summary_path

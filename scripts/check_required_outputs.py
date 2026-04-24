@@ -21,6 +21,7 @@ REQUIRED_TABLES = [
     "rolling_volatility.csv",
     "rolling_sharpe.csv",
     "output_inventory.csv",
+    "pipeline_health_summary.csv",
     "pipeline_manifest.json",
 ]
 
