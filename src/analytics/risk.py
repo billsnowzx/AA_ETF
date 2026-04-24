@@ -145,3 +145,48 @@ def rolling_sharpe_ratio(
         min_periods=min_periods,
     )
     return rolling_mean / rolling_vol.replace(0.0, np.nan)
+
+
+def portfolio_variance(weights: pd.Series, covariance: pd.DataFrame) -> float:
+    """Compute portfolio variance from asset weights and a covariance matrix."""
+    aligned_covariance = covariance.reindex(index=weights.index, columns=weights.index)
+    if aligned_covariance.isna().any().any():
+        missing_assets = [
+            asset for asset in weights.index
+            if asset not in covariance.index or asset not in covariance.columns
+        ]
+        if missing_assets:
+            raise ValueError(f"Covariance matrix is missing weighted assets: {missing_assets}")
+        raise ValueError("Covariance matrix contains NaN values for weighted assets.")
+    return float(weights.T @ aligned_covariance @ weights)
+
+
+def marginal_contribution_to_risk(weights: pd.Series, covariance: pd.DataFrame) -> pd.Series:
+    """Compute each asset's marginal contribution to portfolio volatility."""
+    aligned_covariance = covariance.reindex(index=weights.index, columns=weights.index)
+    variance = portfolio_variance(weights, aligned_covariance)
+    if variance <= 0.0 or pd.isna(variance):
+        return pd.Series(float("nan"), index=weights.index, name="marginal_contribution_to_risk")
+
+    portfolio_volatility = float(np.sqrt(variance))
+    marginal = aligned_covariance @ weights / portfolio_volatility
+    marginal.name = "marginal_contribution_to_risk"
+    return marginal
+
+
+def risk_contribution_table(weights: pd.Series, covariance: pd.DataFrame) -> pd.DataFrame:
+    """Build an auditable per-asset risk contribution table."""
+    weights = weights.astype(float).copy()
+    weights.name = "weight"
+    marginal = marginal_contribution_to_risk(weights, covariance)
+    absolute = (weights * marginal).rename("absolute_risk_contribution")
+    total_absolute = float(absolute.sum())
+    if total_absolute == 0.0 or pd.isna(total_absolute):
+        percent = pd.Series(float("nan"), index=weights.index, name="percent_risk_contribution")
+    else:
+        percent = (absolute / total_absolute).rename("percent_risk_contribution")
+
+    table = pd.concat([weights, marginal, absolute, percent], axis=1)
+    table["portfolio_volatility"] = float(np.sqrt(portfolio_variance(weights, covariance)))
+    table.index.name = "asset"
+    return table

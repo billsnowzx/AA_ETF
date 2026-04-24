@@ -45,6 +45,16 @@ def test_write_phase1_chart_outputs_creates_required_pngs() -> None:
         },
         index=index,
     )
+    risk_contribution = pd.DataFrame(
+        {
+            "weight": [0.6, 0.4],
+            "marginal_contribution_to_risk": [0.12, 0.04],
+            "absolute_risk_contribution": [0.072, 0.016],
+            "percent_risk_contribution": [0.8182, 0.1818],
+            "portfolio_volatility": [0.088, 0.088],
+        },
+        index=pd.Index(["VTI", "AGG"], name="asset"),
+    )
 
     try:
         chart_paths = write_phase1_chart_outputs(
@@ -55,6 +65,7 @@ def test_write_phase1_chart_outputs_creates_required_pngs() -> None:
             output_dir,
             rolling_volatility_table=rolling_volatility,
             rolling_sharpe_table=rolling_sharpe,
+            risk_contribution_table=risk_contribution,
         )
         assert chart_paths["nav_chart"].exists()
         assert chart_paths["drawdown_chart"].exists()
@@ -62,5 +73,7 @@ def test_write_phase1_chart_outputs_creates_required_pngs() -> None:
         assert chart_paths["correlation_heatmap"].exists()
         assert chart_paths["rolling_volatility_chart"].exists()
         assert chart_paths["rolling_sharpe_chart"].exists()
+        assert chart_paths["risk_contribution_chart"].exists()
+        assert chart_paths["mctr_chart"].exists()
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)

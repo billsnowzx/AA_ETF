@@ -18,6 +18,7 @@ REQUIRED_TABLES = [
     "risk_limit_checks.csv",
     "risk_limit_breaches.csv",
     "risk_limit_breach_summary.csv",
+    "portfolio_risk_contribution.csv",
     "rolling_volatility.csv",
     "rolling_sharpe.csv",
     "output_inventory.csv",
@@ -32,6 +33,8 @@ REQUIRED_FIGURES = [
     "balanced_rolling_volatility.png",
     "balanced_rolling_sharpe.png",
     "correlation_heatmap.png",
+    "balanced_risk_contribution.png",
+    "balanced_mctr.png",
 ]
 
 REQUIRED_REPORTS = [

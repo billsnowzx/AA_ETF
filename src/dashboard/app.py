@@ -132,6 +132,19 @@ def _format_dashboard_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.Da
         if "variance" in frame.columns:
             frame["variance"] = frame["variance"].map(lambda value: _format_decimal(value, digits=6))
 
+    if "portfolio_risk_contribution" in formatted:
+        frame = formatted["portfolio_risk_contribution"]
+        for column in [
+            "weight",
+            "absolute_risk_contribution",
+            "percent_risk_contribution",
+            "portfolio_volatility",
+        ]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_percent)
+        if "marginal_contribution_to_risk" in frame.columns:
+            frame["marginal_contribution_to_risk"] = frame["marginal_contribution_to_risk"].map(_format_decimal)
+
     if "etf_summary" in formatted:
         frame = formatted["etf_summary"]
         for column in ["average_dollar_volume", "latest_rolling_average_dollar_volume"]:
@@ -259,6 +272,7 @@ def build_dashboard_html(
     drawdown_comparisons = _read_csv_if_exists(output_path / "benchmark_drawdown_comparisons.csv")
     top_correlations = _read_csv_if_exists(output_path / "top_correlation_pairs.csv", index_col=None)
     asset_risk_snapshot = _read_csv_if_exists(output_path / "asset_risk_snapshot.csv")
+    portfolio_risk_contribution = _read_csv_if_exists(output_path / "portfolio_risk_contribution.csv")
     etf_summary = _read_csv_if_exists(output_path / "etf_summary.csv")
     data_quality_summary = _read_csv_if_exists(output_path / "data_quality_summary.csv")
     trend_filter_summary = _read_csv_if_exists(output_path / "trend_filter_summary.csv")
@@ -281,6 +295,7 @@ def build_dashboard_html(
             "benchmark_drawdown_comparisons": drawdown_comparisons,
             "top_correlation_pairs": top_correlations,
             "asset_risk_snapshot": asset_risk_snapshot,
+            "portfolio_risk_contribution": portfolio_risk_contribution,
             "etf_summary": etf_summary,
             "data_quality_summary": data_quality_summary,
             "trend_filter_summary": trend_filter_summary,
@@ -303,6 +318,7 @@ def build_dashboard_html(
     drawdown_comparisons = formatted_tables["benchmark_drawdown_comparisons"]
     top_correlations = formatted_tables["top_correlation_pairs"]
     asset_risk_snapshot = formatted_tables["asset_risk_snapshot"]
+    portfolio_risk_contribution = formatted_tables["portfolio_risk_contribution"]
     etf_summary = formatted_tables["etf_summary"]
     data_quality_summary = formatted_tables["data_quality_summary"]
     trend_filter_summary = formatted_tables["trend_filter_summary"]
@@ -335,6 +351,8 @@ def build_dashboard_html(
         ("Rolling Volatility", "balanced_rolling_volatility.png"),
         ("Rolling Sharpe", "balanced_rolling_sharpe.png"),
         ("Correlation Heatmap", "correlation_heatmap.png"),
+        ("Risk Contribution", "balanced_risk_contribution.png"),
+        ("MCTR", "balanced_mctr.png"),
     ]:
         figure_file = figure_path / filename
         if figure_file.exists():
@@ -471,6 +489,10 @@ def build_dashboard_html(
       <section class="card">
         <h2>Asset Risk Snapshot</h2>
         {dataframe_to_html_table(asset_risk_snapshot)}
+      </section>
+      <section class="card">
+        <h2>Portfolio Risk Contribution</h2>
+        {dataframe_to_html_table(portfolio_risk_contribution)}
       </section>
       <section class="card">
         <h2>ETF Summary</h2>

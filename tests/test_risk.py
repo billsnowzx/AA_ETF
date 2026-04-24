@@ -5,6 +5,9 @@ import pandas as pd
 from src.analytics.risk import (
     calmar_ratio,
     downside_volatility,
+    marginal_contribution_to_risk,
+    portfolio_variance,
+    risk_contribution_table,
     risk_summary,
     rolling_sharpe_ratio,
     rolling_volatility,
@@ -71,3 +74,28 @@ def test_rolling_volatility_and_sharpe_return_aligned_series() -> None:
     assert sharpe.index.equals(returns.index)
     assert pd.isna(vol.iloc[0])
     assert vol.iloc[-1] > 0
+
+
+def test_risk_contribution_table_sums_to_portfolio_volatility() -> None:
+    weights = pd.Series({"VTI": 0.6, "AGG": 0.4})
+    covariance = pd.DataFrame(
+        [[0.04, 0.00], [0.00, 0.01]],
+        index=["VTI", "AGG"],
+        columns=["VTI", "AGG"],
+    )
+
+    table = risk_contribution_table(weights, covariance)
+
+    assert math.isclose(portfolio_variance(weights, covariance), 0.016, rel_tol=1e-9)
+    assert math.isclose(float(table["absolute_risk_contribution"].sum()), math.sqrt(0.016), rel_tol=1e-9)
+    assert math.isclose(float(table["percent_risk_contribution"].sum()), 1.0, rel_tol=1e-9)
+    assert table.loc["VTI", "percent_risk_contribution"] > table.loc["AGG", "percent_risk_contribution"]
+
+
+def test_marginal_contribution_to_risk_returns_nan_for_zero_variance() -> None:
+    weights = pd.Series({"VTI": 1.0})
+    covariance = pd.DataFrame([[0.0]], index=["VTI"], columns=["VTI"])
+
+    marginal = marginal_contribution_to_risk(weights, covariance)
+
+    assert math.isnan(float(marginal.loc["VTI"]))

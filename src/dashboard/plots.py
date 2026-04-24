@@ -94,6 +94,38 @@ def save_rolling_metric_chart(
     plt.close(figure)
 
 
+def save_risk_contribution_chart(
+    risk_contribution_table: pd.DataFrame,
+    output_path: str | Path,
+) -> None:
+    """Save a bar chart of asset percent risk contributions."""
+    figure, axis = plt.subplots(figsize=(10, 6))
+    risk_contribution_table["percent_risk_contribution"].plot(kind="bar", ax=axis)
+    axis.set_title("Risk Contribution")
+    axis.set_xlabel("Asset")
+    axis.set_ylabel("Percent of Portfolio Risk")
+    axis.grid(True, axis="y", alpha=0.3)
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
+def save_marginal_contribution_to_risk_chart(
+    risk_contribution_table: pd.DataFrame,
+    output_path: str | Path,
+) -> None:
+    """Save a bar chart of marginal contribution to risk by asset."""
+    figure, axis = plt.subplots(figsize=(10, 6))
+    risk_contribution_table["marginal_contribution_to_risk"].plot(kind="bar", ax=axis)
+    axis.set_title("Marginal Contribution to Risk")
+    axis.set_xlabel("Asset")
+    axis.set_ylabel("MCTR")
+    axis.grid(True, axis="y", alpha=0.3)
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+
+
 def write_phase1_chart_outputs(
     strategy_name: str,
     nav_table: pd.DataFrame,
@@ -102,6 +134,7 @@ def write_phase1_chart_outputs(
     output_dir: str | Path,
     rolling_volatility_table: pd.DataFrame | None = None,
     rolling_sharpe_table: pd.DataFrame | None = None,
+    risk_contribution_table: pd.DataFrame | None = None,
 ) -> dict[str, Path]:
     """Write the required Phase 1 charts to disk."""
     output_path = Path(output_dir)
@@ -117,6 +150,9 @@ def write_phase1_chart_outputs(
         chart_paths["rolling_volatility_chart"] = output_path / f"{strategy_name}_rolling_volatility.png"
     if rolling_sharpe_table is not None and not rolling_sharpe_table.empty:
         chart_paths["rolling_sharpe_chart"] = output_path / f"{strategy_name}_rolling_sharpe.png"
+    if risk_contribution_table is not None and not risk_contribution_table.empty:
+        chart_paths["risk_contribution_chart"] = output_path / f"{strategy_name}_risk_contribution.png"
+        chart_paths["mctr_chart"] = output_path / f"{strategy_name}_mctr.png"
 
     save_nav_chart(nav_table, chart_paths["nav_chart"])
     save_drawdown_chart(nav_table, chart_paths["drawdown_chart"])
@@ -136,4 +172,7 @@ def write_phase1_chart_outputs(
             title="Rolling Sharpe Ratio",
             ylabel="Sharpe Ratio",
         )
+    if "risk_contribution_chart" in chart_paths:
+        save_risk_contribution_chart(risk_contribution_table, chart_paths["risk_contribution_chart"])
+        save_marginal_contribution_to_risk_chart(risk_contribution_table, chart_paths["mctr_chart"])
     return chart_paths

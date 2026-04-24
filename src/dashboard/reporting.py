@@ -299,6 +299,24 @@ def _format_pipeline_health_summary(pipeline_health_summary: pd.DataFrame | None
     return formatted
 
 
+def _format_portfolio_risk_contribution(portfolio_risk_contribution: pd.DataFrame | None) -> pd.DataFrame:
+    """Format portfolio risk contribution metrics for report presentation."""
+    if portfolio_risk_contribution is None or portfolio_risk_contribution.empty:
+        return pd.DataFrame()
+    formatted = portfolio_risk_contribution.astype(object).copy()
+    for column in [
+        "weight",
+        "absolute_risk_contribution",
+        "percent_risk_contribution",
+        "portfolio_volatility",
+    ]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(_format_percent)
+    if "marginal_contribution_to_risk" in formatted.columns:
+        formatted["marginal_contribution_to_risk"] = formatted["marginal_contribution_to_risk"].map(_format_decimal)
+    return formatted
+
+
 def build_run_configuration_summary(
     *,
     start: str,
@@ -349,6 +367,7 @@ def build_phase1_report_markdown(
     risk_limit_breaches: pd.DataFrame | None = None,
     risk_limit_breach_summary: pd.DataFrame | None = None,
     pipeline_health_summary: pd.DataFrame | None = None,
+    portfolio_risk_contribution: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
     """Build a concise Markdown report from Phase 1 pipeline outputs."""
@@ -428,6 +447,7 @@ def build_phase1_report_markdown(
     risk_limit_breach_view = _format_risk_limit_breaches(risk_limit_breaches)
     risk_limit_breach_summary_view = _format_risk_limit_breach_summary(risk_limit_breach_summary)
     pipeline_health_view = _format_pipeline_health_summary(pipeline_health_summary)
+    portfolio_risk_contribution_view = _format_portfolio_risk_contribution(portfolio_risk_contribution)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
@@ -512,6 +532,10 @@ Generated: {report_date}
 
 {dataframe_to_markdown_table(pipeline_health_view) if not pipeline_health_view.empty else "No pipeline health summary generated."}
 
+## Portfolio Risk Contribution
+
+{dataframe_to_markdown_table(portfolio_risk_contribution_view) if not portfolio_risk_contribution_view.empty else "No portfolio risk contribution generated."}
+
 ## ETF Summary
 
 {dataframe_to_markdown_table(etf_view)}
@@ -559,6 +583,7 @@ def build_phase1_report_html(
     risk_limit_breaches: pd.DataFrame | None = None,
     risk_limit_breach_summary: pd.DataFrame | None = None,
     pipeline_health_summary: pd.DataFrame | None = None,
+    portfolio_risk_contribution: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
     """Build a shareable HTML report from Phase 1 pipeline outputs."""
@@ -638,6 +663,7 @@ def build_phase1_report_html(
     risk_limit_breach_view = _format_risk_limit_breaches(risk_limit_breaches)
     risk_limit_breach_summary_view = _format_risk_limit_breach_summary(risk_limit_breach_summary)
     pipeline_health_view = _format_pipeline_health_summary(pipeline_health_summary)
+    portfolio_risk_contribution_view = _format_portfolio_risk_contribution(portfolio_risk_contribution)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
@@ -700,6 +726,7 @@ def build_phase1_report_html(
   <section><h2>Risk Limit Breaches</h2>{dataframe_to_html_table(risk_limit_breach_view) if not risk_limit_breach_view.empty else "<p>No risk limit breaches generated.</p>"}</section>
   <section><h2>Risk Limit Breach Summary</h2>{dataframe_to_html_table(risk_limit_breach_summary_view) if not risk_limit_breach_summary_view.empty else "<p>No risk limit breach summary generated.</p>"}</section>
   <section><h2>Pipeline Health Summary</h2>{dataframe_to_html_table(pipeline_health_view) if not pipeline_health_view.empty else "<p>No pipeline health summary generated.</p>"}</section>
+  <section><h2>Portfolio Risk Contribution</h2>{dataframe_to_html_table(portfolio_risk_contribution_view) if not portfolio_risk_contribution_view.empty else "<p>No portfolio risk contribution generated.</p>"}</section>
   <section><h2>ETF Summary</h2>{dataframe_to_html_table(etf_view)}</section>
   <section><h2>Data Quality Summary</h2>{dataframe_to_html_table(data_quality_view) if not data_quality_view.empty else "<p>No data quality summary generated.</p>"}</section>
   <section><h2>Correlation Highlights</h2>{dataframe_to_html_table(correlation_summary) if not correlation_summary.empty else "<p>No non-diagonal correlation pairs available.</p>"}</section>
@@ -735,6 +762,7 @@ def write_phase1_report(
     risk_limit_breaches: pd.DataFrame | None = None,
     risk_limit_breach_summary: pd.DataFrame | None = None,
     pipeline_health_summary: pd.DataFrame | None = None,
+    portfolio_risk_contribution: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
     """Write the Phase 1 Markdown report to disk."""
@@ -763,6 +791,7 @@ def write_phase1_report(
         risk_limit_breaches=risk_limit_breaches,
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=pipeline_health_summary,
+        portfolio_risk_contribution=portfolio_risk_contribution,
         run_configuration=run_configuration,
         notes=notes,
     )
@@ -795,6 +824,7 @@ def write_phase1_html_report(
     risk_limit_breaches: pd.DataFrame | None = None,
     risk_limit_breach_summary: pd.DataFrame | None = None,
     pipeline_health_summary: pd.DataFrame | None = None,
+    portfolio_risk_contribution: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
     """Write the Phase 1 HTML report to disk."""
@@ -823,6 +853,7 @@ def write_phase1_html_report(
         risk_limit_breaches=risk_limit_breaches,
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=pipeline_health_summary,
+        portfolio_risk_contribution=portfolio_risk_contribution,
         run_configuration=run_configuration,
         notes=notes,
     )

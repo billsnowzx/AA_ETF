@@ -19,6 +19,7 @@ from run_pipeline import (
     build_output_inventory,
     build_performance_summary,
     build_pipeline_manifest,
+    build_portfolio_risk_contribution_table,
     build_risk_matrix_outputs,
     build_rolling_metric_outputs,
     build_return_table,
@@ -270,6 +271,7 @@ def test_build_summary_tables_and_write_outputs() -> None:
     nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
+    risk_contribution = build_portfolio_risk_contribution_table(strategy_result, risk_outputs["covariance_matrix"])
     rolling_outputs = build_rolling_metric_outputs(return_table, window=2, periods_per_year=2)
 
     output_dir = Path("data/cache") / f"test_pipeline_outputs_{uuid.uuid4().hex}"
@@ -291,6 +293,7 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert "correlation_pairs" in risk_outputs
         assert "top_correlation_pairs" in risk_outputs
         assert "asset_risk_snapshot" in risk_outputs
+        assert "percent_risk_contribution" in risk_contribution.columns
         assert "rolling_volatility" in rolling_outputs
         assert "rolling_sharpe" in rolling_outputs
         write_rolling_metric_outputs(rolling_outputs, output_dir)
@@ -306,6 +309,7 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert (output_dir / "correlation_pairs.csv").exists()
         assert (output_dir / "top_correlation_pairs.csv").exists()
         assert (output_dir / "asset_risk_snapshot.csv").exists()
+        assert (output_dir / "portfolio_risk_contribution.csv").exists()
         assert (output_dir / "trend_filter_summary.csv").exists()
         assert (output_dir / "trend_filter_active.csv").exists()
         assert (output_dir / "trend_filter_scales.csv").exists()

@@ -45,6 +45,16 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         pd.DataFrame({"avg_correlation": ["0.4389"], "variance": ["0.000129"]}, index=pd.Index(["VTI"])).to_csv(
             table_dir / "asset_risk_snapshot.csv"
         )
+        pd.DataFrame(
+            {
+                "weight": [0.6],
+                "marginal_contribution_to_risk": [0.12],
+                "absolute_risk_contribution": [0.072],
+                "percent_risk_contribution": [0.8182],
+                "portfolio_volatility": [0.088],
+            },
+            index=pd.Index(["VTI"], name="asset"),
+        ).to_csv(table_dir / "portfolio_risk_contribution.csv")
         pd.DataFrame({"balanced": [0.10]}, index=pd.Index(["2024-01-01"], name="date")).to_csv(
             table_dir / "rolling_volatility.csv"
         )
@@ -160,6 +170,8 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
             encoding="utf-8",
         )
         (figure_dir / "balanced_nav.png").write_bytes(b"fake")
+        (figure_dir / "balanced_risk_contribution.png").write_bytes(b"fake")
+        (figure_dir / "balanced_mctr.png").write_bytes(b"fake")
         (report_dir / "balanced_phase1_report.html").write_text("<html></html>", encoding="utf-8")
 
         html = build_dashboard_html(output_dir=table_dir, figure_dir=figure_dir, report_dir=report_dir)
@@ -186,6 +198,9 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Risk Limit Checks" in html
         assert "Risk Limit Breaches" in html
         assert "Risk Limit Breach Summary" in html
+        assert "Portfolio Risk Contribution" in html
+        assert "balanced_risk_contribution.png" in html
+        assert "balanced_mctr.png" in html
         assert "66.67%" in html
         assert "Recent Rebalance Reasons" in html
         assert "Rebalance Reason Summary" in html
@@ -212,6 +227,16 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
             ),
             "top_correlation_pairs": pd.DataFrame({"pair": ["VTI vs VEA"], "correlation": [0.8604]}),
             "asset_risk_snapshot": pd.DataFrame({"avg_correlation": [0.4389], "variance": [0.000129]}),
+            "portfolio_risk_contribution": pd.DataFrame(
+                {
+                    "weight": [0.6],
+                    "marginal_contribution_to_risk": [0.12],
+                    "absolute_risk_contribution": [0.072],
+                    "percent_risk_contribution": [0.8182],
+                    "portfolio_volatility": [0.088],
+                },
+                index=pd.Index(["VTI"]),
+            ),
             "rolling_volatility": pd.DataFrame({"balanced": [0.10]}),
             "rolling_sharpe": pd.DataFrame({"balanced": [0.5]}),
             "manifest_summary": pd.DataFrame({"value": [1.25]}, index=pd.Index(["ending_nav"])),
@@ -285,6 +310,9 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["benchmark_drawdown_comparisons"].loc["benchmark_a", "max_drawdown_gap"] == "-5.00%"
     assert tables["top_correlation_pairs"].iloc[0]["correlation"] == "0.8604"
     assert tables["asset_risk_snapshot"].iloc[0]["variance"] == "0.000129"
+    assert tables["portfolio_risk_contribution"].loc["VTI", "weight"] == "60.00%"
+    assert tables["portfolio_risk_contribution"].loc["VTI", "percent_risk_contribution"] == "81.82%"
+    assert tables["portfolio_risk_contribution"].loc["VTI", "marginal_contribution_to_risk"] == "0.1200"
     assert tables["rolling_volatility"].iloc[0]["balanced"] == "10.00%"
     assert tables["rolling_sharpe"].iloc[0]["balanced"] == "0.5000"
     assert tables["manifest_summary"].loc["ending_nav", "value"] == "1.2500"

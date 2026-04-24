@@ -19,7 +19,7 @@ from src.analytics.correlation import (
     return_matrix_from_prices,
 )
 from src.analytics.drawdown import drawdown_from_returns
-from src.analytics.risk import rolling_sharpe_ratio, rolling_volatility
+from src.analytics.risk import risk_contribution_table, rolling_sharpe_ratio, rolling_volatility
 from src.backtest.engine import run_fixed_weight_backtest
 from src.data.clean_data import batch_clean_price_frames, build_data_quality_summary
 from src.data.fetch_prices import fetch_prices
@@ -449,6 +449,29 @@ def build_risk_matrix_outputs(asset_returns: pd.DataFrame) -> dict[str, pd.DataF
     }
 
 
+def build_portfolio_risk_contribution_table(
+    strategy_result: dict[str, pd.Series | pd.DataFrame],
+    covariance: pd.DataFrame,
+) -> pd.DataFrame:
+    """Build latest portfolio risk contribution metrics from backtest weights."""
+    weights = strategy_result.get("weights_start")
+    if not isinstance(weights, pd.DataFrame) or weights.empty:
+        return pd.DataFrame(
+            columns=[
+                "weight",
+                "marginal_contribution_to_risk",
+                "absolute_risk_contribution",
+                "percent_risk_contribution",
+                "portfolio_volatility",
+            ]
+        )
+
+    latest_weights = weights.dropna(how="all").tail(1)
+    if latest_weights.empty:
+        return pd.DataFrame()
+    return risk_contribution_table(latest_weights.iloc[0], covariance)
+
+
 def write_backtest_outputs(
     strategy_name: str,
     strategy_result: dict[str, pd.Series | pd.DataFrame],
@@ -474,6 +497,10 @@ def write_backtest_outputs(
     nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
+    portfolio_risk_contribution = build_portfolio_risk_contribution_table(
+        strategy_result,
+        risk_outputs["covariance_matrix"],
+    )
 
     performance_summary.to_csv(output_path / "performance_summary.csv", index=True)
     turnover_summary.to_csv(output_path / "turnover_summary.csv", index=True)
@@ -494,6 +521,7 @@ def write_backtest_outputs(
     risk_outputs["correlation_pairs"].to_csv(output_path / "correlation_pairs.csv", index=False)
     risk_outputs["top_correlation_pairs"].to_csv(output_path / "top_correlation_pairs.csv", index=False)
     risk_outputs["asset_risk_snapshot"].to_csv(output_path / "asset_risk_snapshot.csv", index=True)
+    portfolio_risk_contribution.to_csv(output_path / "portfolio_risk_contribution.csv", index=True)
     if "trend_filter_active" in strategy_result:
         strategy_result["trend_filter_active"].to_csv(output_path / "trend_filter_active.csv", index=True)
     if "trend_filter_scales" in strategy_result:
@@ -512,6 +540,7 @@ def write_backtest_outputs(
     LOGGER.info("Saved correlation matrix to %s", output_path / "correlation_matrix.csv")
     LOGGER.info("Saved top correlation pairs to %s", output_path / "top_correlation_pairs.csv")
     LOGGER.info("Saved asset risk snapshot to %s", output_path / "asset_risk_snapshot.csv")
+    LOGGER.info("Saved portfolio risk contribution to %s", output_path / "portfolio_risk_contribution.csv")
     if "trend_filter_active" in strategy_result:
         LOGGER.info("Saved trend filter active flags to %s", output_path / "trend_filter_active.csv")
     if "trend_filter_scales" in strategy_result:
@@ -1074,6 +1103,11 @@ def main() -> None:
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
     rolling_outputs = build_rolling_metric_outputs(return_table, window=args.rolling_window)
     write_rolling_metric_outputs(rolling_outputs, args.output_dir)
+    risk_outputs = build_risk_matrix_outputs(asset_returns)
+    portfolio_risk_contribution = build_portfolio_risk_contribution_table(
+        strategy_result,
+        risk_outputs["covariance_matrix"],
+    )
     chart_paths = write_phase1_chart_outputs(
         strategy_name,
         build_nav_table(strategy_name, strategy_result, benchmark_results),
@@ -1082,6 +1116,7 @@ def main() -> None:
         args.figure_dir,
         rolling_volatility_table=rolling_outputs["rolling_volatility"],
         rolling_sharpe_table=rolling_outputs["rolling_sharpe"],
+        risk_contribution_table=portfolio_risk_contribution,
     )
     LOGGER.info("Saved Phase 1 charts: %s", chart_paths)
 
@@ -1099,7 +1134,6 @@ def main() -> None:
     risk_limit_breach_summary_path = write_risk_limit_breach_summary_output(
         risk_limit_breach_summary, args.output_dir
     )
-    risk_outputs = build_risk_matrix_outputs(asset_returns)
     rolling_metric_snapshot = build_latest_rolling_metric_snapshot(
         rolling_outputs["rolling_volatility"],
         rolling_outputs["rolling_sharpe"],
@@ -1166,6 +1200,7 @@ def main() -> None:
         risk_limit_breaches=risk_limit_breaches,
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=None,
+        portfolio_risk_contribution=portfolio_risk_contribution,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1193,6 +1228,7 @@ def main() -> None:
         risk_limit_breaches=risk_limit_breaches,
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=None,
+        portfolio_risk_contribution=portfolio_risk_contribution,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1272,6 +1308,7 @@ def main() -> None:
         risk_limit_breaches=risk_limit_breaches,
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=pipeline_health_summary,
+        portfolio_risk_contribution=portfolio_risk_contribution,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1299,6 +1336,7 @@ def main() -> None:
         risk_limit_breaches=risk_limit_breaches,
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=pipeline_health_summary,
+        portfolio_risk_contribution=portfolio_risk_contribution,
         run_configuration=run_configuration,
         notes=report_notes,
     )

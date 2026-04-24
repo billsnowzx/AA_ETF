@@ -13,6 +13,7 @@ Phase 1 includes:
 - Return and annualization analytics
 - Drawdown and basic risk-adjusted analytics
 - Covariance and correlation analytics
+- Portfolio risk contribution and marginal contribution to risk analytics
 - Benchmark-relative attribution and annual return tables
 - Portfolio template loading and weight normalization
 - Static-weight portfolio return and transaction-cost helpers
@@ -116,11 +117,12 @@ This command will:
 - generate `rolling_volatility.csv`, `rolling_sharpe.csv`, and `drawdown_series.csv`
 - generate `covariance_matrix.csv`, `correlation_matrix.csv`, `covariance_pairs.csv`, and `correlation_pairs.csv`
 - generate `top_correlation_pairs.csv` and `asset_risk_snapshot.csv`
+- generate `portfolio_risk_contribution.csv` with latest weights, MCTR, absolute risk contribution, and percent risk contribution
 - generate `backtest_universe_validation.csv` and `backtest_universe_policy_summary.csv`
 - generate `run_configuration.csv` with CLI parameters and config file inputs for auditability
 - generate `output_inventory.csv` with existence and file-size checks for generated artifacts
 - generate `pipeline_manifest.json` with run parameters, selected universes, and output paths
-- generate the required Phase 1 charts under `outputs/figures/`
+- generate the required Phase 1 charts under `outputs/figures/`, including risk contribution and MCTR charts
 - generate Markdown and HTML reports under `outputs/reports/`
 
 ## Running the local dashboard
