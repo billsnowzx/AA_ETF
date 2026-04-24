@@ -44,6 +44,11 @@ from src.portfolio.rebalancer import (
     load_drift_rule_enabled,
     load_relative_drift_threshold,
 )
+from src.portfolio.risk_limits import (
+    build_portfolio_risk_limit_checks,
+    find_risk_limit_breaches,
+    load_risk_limits,
+)
 from src.portfolio.transaction_cost import load_one_way_transaction_cost_bps
 from src.portfolio.weights import load_portfolio_template
 from src.universe.etf_scoring import score_etf_universe
@@ -589,6 +594,19 @@ def write_run_configuration_output(
     return config_path
 
 
+def write_risk_limit_output(
+    risk_limit_checks: pd.DataFrame,
+    output_dir: str | Path,
+) -> Path:
+    """Persist risk-limit check table as an auditable CSV."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    risk_limit_path = output_path / "risk_limit_checks.csv"
+    risk_limit_checks.to_csv(risk_limit_path, index=True)
+    LOGGER.info("Saved risk limit checks to %s", risk_limit_path)
+    return risk_limit_path
+
+
 def collect_table_output_paths(output_dir: str | Path) -> dict[str, Path]:
     """Collect generated table output files for the pipeline manifest."""
     output_path = Path(output_dir)
@@ -781,6 +799,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Raise an error when output inventory reports empty artifacts (size <= 0).",
     )
     parser.add_argument(
+        "--fail-on-risk-limit-breach",
+        action="store_true",
+        help="Raise an error when enabled risk-limit checks are breached.",
+    )
+    parser.add_argument(
         "--as-of-date",
         default=None,
         help="Optional deterministic run date (YYYY-MM-DD) recorded in the manifest.",
@@ -898,6 +921,10 @@ def main() -> None:
     turnover_summary = build_turnover_summary(strategy_name, strategy_result, benchmark_results)
     trend_filter_summary = build_trend_filter_summary(strategy_name, strategy_result)
     rebalance_reason_table = build_rebalance_reason_table(strategy_name, strategy_result, benchmark_results)
+    risk_limits = load_risk_limits(args.risk_limits_config)
+    risk_limit_checks = build_portfolio_risk_limit_checks(performance_summary, risk_limits)
+    risk_limit_path = write_risk_limit_output(risk_limit_checks, args.output_dir)
+    risk_limit_breaches = find_risk_limit_breaches(risk_limit_checks)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
     rolling_metric_snapshot = build_latest_rolling_metric_snapshot(
         rolling_outputs["rolling_volatility"],
@@ -917,6 +944,14 @@ def main() -> None:
             + f" (moving_average_days={trend_filter_settings['moving_average_days']}, "
             + f"reduction_fraction={trend_filter_settings['reduction_fraction']:.2f})"
         )
+    if not risk_limit_breaches.empty:
+        breach_labels = ", ".join(
+            f"{row.portfolio}:{row.metric}"
+            for row in risk_limit_breaches.itertuples()
+        )
+        report_notes.append(f"Risk-limit breaches observed: {breach_labels}")
+        if args.fail_on_risk_limit_breach:
+            raise RuntimeError("Risk-limit validation failed; breached checks: " + breach_labels)
     config_paths = {
         "universe": args.universe_config,
         "portfolio_templates": args.portfolio_config,
@@ -953,6 +988,7 @@ def main() -> None:
         trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         rebalance_reason_table=rebalance_reason_table,
+        risk_limit_checks=risk_limit_checks,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -976,6 +1012,7 @@ def main() -> None:
         trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         rebalance_reason_table=rebalance_reason_table,
+        risk_limit_checks=risk_limit_checks,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1043,6 +1080,7 @@ def main() -> None:
 
     final_table_paths = collect_table_output_paths(args.output_dir)
     final_table_paths["output_inventory"] = inventory_path
+    final_table_paths["risk_limit_checks"] = risk_limit_path
     manifest = build_pipeline_manifest(
         start=args.start,
         end=args.end,

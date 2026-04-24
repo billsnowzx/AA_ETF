@@ -73,6 +73,18 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         ).to_csv(table_dir / "trend_filter_summary.csv")
         pd.DataFrame(
             {
+                "portfolio": ["balanced"],
+                "metric": ["max_drawdown"],
+                "threshold": [0.25],
+                "observed": [-0.20],
+                "comparison_value": [0.20],
+                "limit_enabled": [True],
+                "breach": [False],
+            },
+            index=pd.Index(["balanced:max_drawdown"], name="rule_id"),
+        ).to_csv(table_dir / "risk_limit_checks.csv")
+        pd.DataFrame(
+            {
                 "balanced": ["none", "calendar", "calendar+drift"],
                 "benchmark_a": ["calendar", "none", "drift"],
             },
@@ -138,6 +150,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "config/etf_universe.yaml" in html
         assert "Data Quality Summary" in html
         assert "Trend Filter Summary" in html
+        assert "Risk Limit Checks" in html
         assert "66.67%" in html
         assert "Recent Rebalance Reasons" in html
         assert "Rebalance Reason Summary" in html
@@ -179,6 +192,15 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
                     "max_reduced_assets": [1],
                 }
             ),
+            "risk_limit_checks": pd.DataFrame(
+                {
+                    "threshold": [0.25],
+                    "observed": [-0.20],
+                    "comparison_value": [0.20],
+                    "breach": [False],
+                },
+                index=pd.Index(["balanced:max_drawdown"]),
+            ),
             "rebalance_reason": pd.DataFrame({"balanced": ["calendar+drift"]}, index=pd.Index(["2024-01-04"])),
             "rebalance_reason_summary": pd.DataFrame(
                 {"rebalance_ratio": [2.0 / 3.0], "top_reason": ["calendar"]},
@@ -210,6 +232,8 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["data_quality_summary"].iloc[0]["observations"] == "2"
     assert tables["trend_filter_summary"].iloc[0]["trend_active_ratio"] == "66.67%"
     assert tables["trend_filter_summary"].iloc[0]["max_reduced_assets"] == "1"
+    assert tables["risk_limit_checks"].loc["balanced:max_drawdown", "threshold"] == "25.00%"
+    assert tables["risk_limit_checks"].loc["balanced:max_drawdown", "observed"] == "-20.00%"
     assert tables["rebalance_reason"].iloc[0]["balanced"] == "calendar+drift"
     assert tables["rebalance_reason_summary"].loc["balanced", "rebalance_ratio"] == "66.67%"
     assert tables["etf_summary"].loc["VTI", "average_dollar_volume"] == "1000000"

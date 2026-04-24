@@ -254,6 +254,18 @@ def _build_recent_rebalance_events(rebalance_reason_table: pd.DataFrame | None, 
     return recent.tail(limit)
 
 
+def _format_risk_limit_checks(risk_limit_checks: pd.DataFrame | None) -> pd.DataFrame:
+    """Format risk-limit checks for report presentation."""
+    if risk_limit_checks is None or risk_limit_checks.empty:
+        return pd.DataFrame()
+
+    formatted = risk_limit_checks.astype(object).copy()
+    for column in ["threshold", "observed", "comparison_value"]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(_format_percent)
+    return formatted
+
+
 def build_run_configuration_summary(
     *,
     start: str,
@@ -300,6 +312,7 @@ def build_phase1_report_markdown(
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     rebalance_reason_table: pd.DataFrame | None = None,
+    risk_limit_checks: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
     """Build a concise Markdown report from Phase 1 pipeline outputs."""
@@ -375,6 +388,7 @@ def build_phase1_report_markdown(
     data_quality_view = _format_data_quality_summary(data_quality_summary)
     rebalance_summary_view = _format_rebalance_reason_summary(build_rebalance_reason_summary(rebalance_reason_table))
     recent_rebalance_events = _build_recent_rebalance_events(rebalance_reason_table)
+    risk_limit_view = _format_risk_limit_checks(risk_limit_checks)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
@@ -443,6 +457,10 @@ Generated: {report_date}
 
 {dataframe_to_markdown_table(recent_rebalance_events) if not recent_rebalance_events.empty else "No recent rebalance events generated."}
 
+## Risk Limit Checks
+
+{dataframe_to_markdown_table(risk_limit_view) if not risk_limit_view.empty else "No risk limit checks generated."}
+
 ## ETF Summary
 
 {dataframe_to_markdown_table(etf_view)}
@@ -486,6 +504,7 @@ def build_phase1_report_html(
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     rebalance_reason_table: pd.DataFrame | None = None,
+    risk_limit_checks: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
     """Build a shareable HTML report from Phase 1 pipeline outputs."""
@@ -561,6 +580,7 @@ def build_phase1_report_html(
     data_quality_view = _format_data_quality_summary(data_quality_summary)
     rebalance_summary_view = _format_rebalance_reason_summary(build_rebalance_reason_summary(rebalance_reason_table))
     recent_rebalance_events = _build_recent_rebalance_events(rebalance_reason_table)
+    risk_limit_view = _format_risk_limit_checks(risk_limit_checks)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
@@ -619,6 +639,7 @@ def build_phase1_report_html(
   <section><h2>Trend Filter Summary</h2>{dataframe_to_html_table(trend_view) if not trend_view.empty else "<p>No trend filter summary generated.</p>"}</section>
   <section><h2>Rebalance Reason Summary</h2>{dataframe_to_html_table(rebalance_summary_view) if not rebalance_summary_view.empty else "<p>No rebalance reason summary generated.</p>"}</section>
   <section><h2>Recent Rebalance Events</h2>{dataframe_to_html_table(recent_rebalance_events) if not recent_rebalance_events.empty else "<p>No recent rebalance events generated.</p>"}</section>
+  <section><h2>Risk Limit Checks</h2>{dataframe_to_html_table(risk_limit_view) if not risk_limit_view.empty else "<p>No risk limit checks generated.</p>"}</section>
   <section><h2>ETF Summary</h2>{dataframe_to_html_table(etf_view)}</section>
   <section><h2>Data Quality Summary</h2>{dataframe_to_html_table(data_quality_view) if not data_quality_view.empty else "<p>No data quality summary generated.</p>"}</section>
   <section><h2>Correlation Highlights</h2>{dataframe_to_html_table(correlation_summary) if not correlation_summary.empty else "<p>No non-diagonal correlation pairs available.</p>"}</section>
@@ -650,6 +671,7 @@ def write_phase1_report(
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     rebalance_reason_table: pd.DataFrame | None = None,
+    risk_limit_checks: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
     """Write the Phase 1 Markdown report to disk."""
@@ -674,6 +696,7 @@ def write_phase1_report(
         trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         rebalance_reason_table=rebalance_reason_table,
+        risk_limit_checks=risk_limit_checks,
         run_configuration=run_configuration,
         notes=notes,
     )
@@ -702,6 +725,7 @@ def write_phase1_html_report(
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     rebalance_reason_table: pd.DataFrame | None = None,
+    risk_limit_checks: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
     """Write the Phase 1 HTML report to disk."""
@@ -726,6 +750,7 @@ def write_phase1_html_report(
         trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         rebalance_reason_table=rebalance_reason_table,
+        risk_limit_checks=risk_limit_checks,
         run_configuration=run_configuration,
         notes=notes,
     )

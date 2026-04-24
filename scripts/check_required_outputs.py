@@ -15,6 +15,7 @@ REQUIRED_TABLES = [
     "trend_filter_summary.csv",
     "rebalance_reason.csv",
     "rebalance_reason_summary.csv",
+    "risk_limit_checks.csv",
     "rolling_volatility.csv",
     "rolling_sharpe.csv",
     "output_inventory.csv",

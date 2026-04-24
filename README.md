@@ -112,6 +112,7 @@ This command will:
 - generate `benchmark_annual_excess_returns.csv` and `benchmark_drawdown_comparisons.csv`
 - generate `trend_filter_summary.csv`, `trend_filter_active.csv`, and `trend_filter_scales.csv`
 - generate `rebalance_reason.csv` with per-date rebalance trigger reasons
+- generate `risk_limit_checks.csv` with config-driven risk-limit audit checks
 - generate `rolling_volatility.csv`, `rolling_sharpe.csv`, and `drawdown_series.csv`
 - generate `covariance_matrix.csv`, `correlation_matrix.csv`, `covariance_pairs.csv`, and `correlation_pairs.csv`
 - generate `top_correlation_pairs.csv` and `asset_risk_snapshot.csv`
@@ -145,6 +146,7 @@ Optional policy:
 - `--backtest-universe-mode configured` keeps configured strategy and benchmark assets in the backtest even if some fail the liquidity screen.
 - `--backtest-universe-mode liquidity_filtered` requires every configured backtest asset to pass the liquidity screen and raises an error otherwise.
 - `--fail-on-missing-outputs` raises an error when `output_inventory.csv` detects missing expected artifacts.
+- `--fail-on-risk-limit-breach` raises an error when enabled portfolio risk limits are breached.
 
 Current Phase 1 config note:
 
