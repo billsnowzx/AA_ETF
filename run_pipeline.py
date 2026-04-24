@@ -607,6 +607,19 @@ def write_risk_limit_output(
     return risk_limit_path
 
 
+def write_risk_limit_breaches_output(
+    risk_limit_breaches: pd.DataFrame,
+    output_dir: str | Path,
+) -> Path:
+    """Persist risk-limit breaches as an auditable CSV."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    risk_limit_breaches_path = output_path / "risk_limit_breaches.csv"
+    risk_limit_breaches.to_csv(risk_limit_breaches_path, index=True)
+    LOGGER.info("Saved risk limit breaches to %s", risk_limit_breaches_path)
+    return risk_limit_breaches_path
+
+
 def collect_table_output_paths(output_dir: str | Path) -> dict[str, Path]:
     """Collect generated table output files for the pipeline manifest."""
     output_path = Path(output_dir)
@@ -926,6 +939,7 @@ def main() -> None:
     risk_limit_checks = build_portfolio_risk_limit_checks(performance_summary, risk_limits)
     risk_limit_path = write_risk_limit_output(risk_limit_checks, args.output_dir)
     risk_limit_breaches = find_risk_limit_breaches(risk_limit_checks)
+    risk_limit_breaches_path = write_risk_limit_breaches_output(risk_limit_breaches, args.output_dir)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
     rolling_metric_snapshot = build_latest_rolling_metric_snapshot(
         rolling_outputs["rolling_volatility"],
@@ -990,6 +1004,7 @@ def main() -> None:
         rolling_metric_snapshot=rolling_metric_snapshot,
         rebalance_reason_table=rebalance_reason_table,
         risk_limit_checks=risk_limit_checks,
+        risk_limit_breaches=risk_limit_breaches,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1014,6 +1029,7 @@ def main() -> None:
         rolling_metric_snapshot=rolling_metric_snapshot,
         rebalance_reason_table=rebalance_reason_table,
         risk_limit_checks=risk_limit_checks,
+        risk_limit_breaches=risk_limit_breaches,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1082,6 +1098,7 @@ def main() -> None:
     final_table_paths = collect_table_output_paths(args.output_dir)
     final_table_paths["output_inventory"] = inventory_path
     final_table_paths["risk_limit_checks"] = risk_limit_path
+    final_table_paths["risk_limit_breaches"] = risk_limit_breaches_path
     manifest = build_pipeline_manifest(
         start=args.start,
         end=args.end,
