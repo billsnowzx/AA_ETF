@@ -834,6 +834,7 @@ def main() -> None:
         portfolio_config_path=args.portfolio_config,
         benchmark_config_path=args.benchmark_config,
         rebalance_config_path=args.rebalance_config,
+        risk_limits_config_path=args.risk_limits_config,
     )
 
     if args.seed is not None:

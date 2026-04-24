@@ -147,12 +147,44 @@ def validate_rebalance_schema(config: dict[str, Any], config_path: str | Path) -
             raise ValueError(f"{config_path}: trend_filter.reduction_fraction must be <= 1.0.")
 
 
+def validate_risk_limits_schema(config: dict[str, Any], config_path: str | Path) -> None:
+    """Validate risk-limit YAML shape and required fields."""
+    risk_limits = _require_mapping(config.get("risk_limits"), f"{config_path}: risk_limits")
+    portfolio = _require_mapping(risk_limits.get("portfolio"), f"{config_path}: risk_limits.portfolio")
+    liquidity = _require_mapping(risk_limits.get("liquidity"), f"{config_path}: risk_limits.liquidity")
+
+    annualized_volatility_warning = portfolio.get("annualized_volatility_warning")
+    max_drawdown_warning = portfolio.get("max_drawdown_warning")
+    if annualized_volatility_warning is not None:
+        _require_non_negative_number(
+            annualized_volatility_warning,
+            f"{config_path}: risk_limits.portfolio.annualized_volatility_warning",
+        )
+    if max_drawdown_warning is not None:
+        _require_non_negative_number(
+            max_drawdown_warning,
+            f"{config_path}: risk_limits.portfolio.max_drawdown_warning",
+        )
+
+    _require_non_negative_number(
+        liquidity.get("minimum_average_daily_dollar_volume"),
+        f"{config_path}: risk_limits.liquidity.minimum_average_daily_dollar_volume",
+    )
+    recent_liquidity_pass_ratio = _require_non_negative_number(
+        liquidity.get("recent_liquidity_pass_ratio"),
+        f"{config_path}: risk_limits.liquidity.recent_liquidity_pass_ratio",
+    )
+    if recent_liquidity_pass_ratio > 1.0:
+        raise ValueError(f"{config_path}: risk_limits.liquidity.recent_liquidity_pass_ratio must be <= 1.0.")
+
+
 def validate_phase1_config_files(
     *,
     universe_config_path: str | Path,
     portfolio_config_path: str | Path,
     benchmark_config_path: str | Path,
     rebalance_config_path: str | Path,
+    risk_limits_config_path: str | Path,
 ) -> None:
     """Validate all Phase 1 config files and raise one aggregated error if invalid."""
     config_paths = {
@@ -160,6 +192,7 @@ def validate_phase1_config_files(
         "portfolio_templates": Path(portfolio_config_path),
         "benchmarks": Path(benchmark_config_path),
         "rebalance_rules": Path(rebalance_config_path),
+        "risk_limits": Path(risk_limits_config_path),
     }
     errors: list[str] = []
 
@@ -175,6 +208,7 @@ def validate_phase1_config_files(
         ("portfolio_templates", validate_portfolio_templates_schema),
         ("benchmarks", validate_benchmark_schema),
         ("rebalance_rules", validate_rebalance_schema),
+        ("risk_limits", validate_risk_limits_schema),
     ]
 
     for name, validator in validators:

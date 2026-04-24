@@ -47,6 +47,21 @@ def _valid_rebalance() -> dict:
     }
 
 
+def _valid_risk_limits() -> dict:
+    return {
+        "risk_limits": {
+            "portfolio": {
+                "annualized_volatility_warning": 0.25,
+                "max_drawdown_warning": 0.30,
+            },
+            "liquidity": {
+                "minimum_average_daily_dollar_volume": 50_000_000,
+                "recent_liquidity_pass_ratio": 0.80,
+            },
+        }
+    }
+
+
 def test_validate_phase1_config_files_accepts_valid_files() -> None:
     root = Path("data/cache") / f"config_schema_valid_{uuid.uuid4().hex}"
     root.mkdir(parents=True, exist_ok=True)
@@ -54,18 +69,21 @@ def test_validate_phase1_config_files_accepts_valid_files() -> None:
     templates = root / "portfolio_templates.yaml"
     benchmarks = root / "benchmark_config.yaml"
     rebalance = root / "rebalance_rules.yaml"
+    risk_limits = root / "risk_limits.yaml"
 
     try:
         _write_yaml(universe, _valid_universe())
         _write_yaml(templates, _valid_templates())
         _write_yaml(benchmarks, _valid_benchmarks())
         _write_yaml(rebalance, _valid_rebalance())
+        _write_yaml(risk_limits, _valid_risk_limits())
 
         validate_phase1_config_files(
             universe_config_path=universe,
             portfolio_config_path=templates,
             benchmark_config_path=benchmarks,
             rebalance_config_path=rebalance,
+            risk_limits_config_path=risk_limits,
         )
     finally:
         shutil.rmtree(root, ignore_errors=True)
@@ -78,6 +96,7 @@ def test_validate_phase1_config_files_raises_clear_error_for_invalid_schema() ->
     templates = root / "portfolio_templates.yaml"
     benchmarks = root / "benchmark_config.yaml"
     rebalance = root / "rebalance_rules.yaml"
+    risk_limits = root / "risk_limits.yaml"
 
     invalid_universe = _valid_universe()
     invalid_universe["tickers"]["VTI"]["enabled"] = "yes"
@@ -89,6 +108,7 @@ def test_validate_phase1_config_files_raises_clear_error_for_invalid_schema() ->
         _write_yaml(templates, _valid_templates())
         _write_yaml(benchmarks, _valid_benchmarks())
         _write_yaml(rebalance, invalid_rebalance)
+        _write_yaml(risk_limits, _valid_risk_limits())
 
         with pytest.raises(ValueError, match="Config schema validation failed"):
             validate_phase1_config_files(
@@ -96,6 +116,38 @@ def test_validate_phase1_config_files_raises_clear_error_for_invalid_schema() ->
                 portfolio_config_path=templates,
                 benchmark_config_path=benchmarks,
                 rebalance_config_path=rebalance,
+                risk_limits_config_path=risk_limits,
+            )
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_validate_phase1_config_files_raises_for_invalid_risk_limits_schema() -> None:
+    root = Path("data/cache") / f"config_schema_invalid_risk_limits_{uuid.uuid4().hex}"
+    root.mkdir(parents=True, exist_ok=True)
+    universe = root / "etf_universe.yaml"
+    templates = root / "portfolio_templates.yaml"
+    benchmarks = root / "benchmark_config.yaml"
+    rebalance = root / "rebalance_rules.yaml"
+    risk_limits = root / "risk_limits.yaml"
+
+    invalid_risk_limits = _valid_risk_limits()
+    invalid_risk_limits["risk_limits"]["liquidity"]["recent_liquidity_pass_ratio"] = 1.2
+
+    try:
+        _write_yaml(universe, _valid_universe())
+        _write_yaml(templates, _valid_templates())
+        _write_yaml(benchmarks, _valid_benchmarks())
+        _write_yaml(rebalance, _valid_rebalance())
+        _write_yaml(risk_limits, invalid_risk_limits)
+
+        with pytest.raises(ValueError, match="recent_liquidity_pass_ratio"):
+            validate_phase1_config_files(
+                universe_config_path=universe,
+                portfolio_config_path=templates,
+                benchmark_config_path=benchmarks,
+                rebalance_config_path=rebalance,
+                risk_limits_config_path=risk_limits,
             )
     finally:
         shutil.rmtree(root, ignore_errors=True)
