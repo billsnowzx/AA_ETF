@@ -45,6 +45,7 @@ from src.portfolio.rebalancer import (
     load_relative_drift_threshold,
 )
 from src.portfolio.risk_limits import (
+    build_risk_limit_breach_summary,
     build_portfolio_risk_limit_checks,
     find_risk_limit_breaches,
     load_risk_limits,
@@ -620,6 +621,19 @@ def write_risk_limit_breaches_output(
     return risk_limit_breaches_path
 
 
+def write_risk_limit_breach_summary_output(
+    risk_limit_breach_summary: pd.DataFrame,
+    output_dir: str | Path,
+) -> Path:
+    """Persist risk-limit breach summary as an auditable CSV."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    risk_limit_breach_summary_path = output_path / "risk_limit_breach_summary.csv"
+    risk_limit_breach_summary.to_csv(risk_limit_breach_summary_path, index=True)
+    LOGGER.info("Saved risk limit breach summary to %s", risk_limit_breach_summary_path)
+    return risk_limit_breach_summary_path
+
+
 def collect_table_output_paths(output_dir: str | Path) -> dict[str, Path]:
     """Collect generated table output files for the pipeline manifest."""
     output_path = Path(output_dir)
@@ -939,7 +953,11 @@ def main() -> None:
     risk_limit_checks = build_portfolio_risk_limit_checks(performance_summary, risk_limits)
     risk_limit_path = write_risk_limit_output(risk_limit_checks, args.output_dir)
     risk_limit_breaches = find_risk_limit_breaches(risk_limit_checks)
+    risk_limit_breach_summary = build_risk_limit_breach_summary(risk_limit_checks)
     risk_limit_breaches_path = write_risk_limit_breaches_output(risk_limit_breaches, args.output_dir)
+    risk_limit_breach_summary_path = write_risk_limit_breach_summary_output(
+        risk_limit_breach_summary, args.output_dir
+    )
     risk_outputs = build_risk_matrix_outputs(asset_returns)
     rolling_metric_snapshot = build_latest_rolling_metric_snapshot(
         rolling_outputs["rolling_volatility"],
@@ -1005,6 +1023,7 @@ def main() -> None:
         rebalance_reason_table=rebalance_reason_table,
         risk_limit_checks=risk_limit_checks,
         risk_limit_breaches=risk_limit_breaches,
+        risk_limit_breach_summary=risk_limit_breach_summary,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1030,6 +1049,7 @@ def main() -> None:
         rebalance_reason_table=rebalance_reason_table,
         risk_limit_checks=risk_limit_checks,
         risk_limit_breaches=risk_limit_breaches,
+        risk_limit_breach_summary=risk_limit_breach_summary,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1099,6 +1119,7 @@ def main() -> None:
     final_table_paths["output_inventory"] = inventory_path
     final_table_paths["risk_limit_checks"] = risk_limit_path
     final_table_paths["risk_limit_breaches"] = risk_limit_breaches_path
+    final_table_paths["risk_limit_breach_summary"] = risk_limit_breach_summary_path
     manifest = build_pipeline_manifest(
         start=args.start,
         end=args.end,

@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.portfolio.risk_limits import (
+    build_risk_limit_breach_summary,
     build_portfolio_risk_limit_checks,
     find_risk_limit_breaches,
     load_risk_limits,
@@ -35,6 +36,7 @@ def test_build_portfolio_risk_limit_checks_flags_breaches() -> None:
 
     checks = build_portfolio_risk_limit_checks(performance_summary, risk_limits)
     breaches = find_risk_limit_breaches(checks)
+    summary = build_risk_limit_breach_summary(checks)
 
     assert bool(checks.loc["balanced:annualized_volatility", "breach"]) is False
     assert bool(checks.loc["benchmark_a:annualized_volatility", "breach"]) is True
@@ -45,6 +47,10 @@ def test_build_portfolio_risk_limit_checks_flags_breaches() -> None:
         "benchmark_a:annualized_volatility",
         "benchmark_a:max_drawdown",
     ]
+    assert int(summary.loc["balanced", "total_enabled_checks"]) == 2
+    assert int(summary.loc["balanced", "breached_checks"]) == 0
+    assert int(summary.loc["benchmark_a", "breached_checks"]) == 2
+    assert math.isclose(float(summary.loc["overall", "breach_ratio"]), 0.5, rel_tol=1e-9)
 
 
 def test_load_risk_limits_raises_for_missing_root_mapping() -> None:

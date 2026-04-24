@@ -84,5 +84,6 @@ def test_phase1_smoke_pipeline_with_local_fixture_data(monkeypatch) -> None:
             figure_dir=figure_dir,
             report_dir=report_dir,
         )
+        assert (table_dir / "risk_limit_breach_summary.csv").exists()
     finally:
         shutil.rmtree(run_root, ignore_errors=True)

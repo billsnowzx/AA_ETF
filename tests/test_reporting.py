@@ -116,6 +116,17 @@ def _sample_risk_limit_breaches() -> pd.DataFrame:
     )
 
 
+def _sample_risk_limit_breach_summary() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "total_enabled_checks": [2, 2, 4],
+            "breached_checks": [1, 1, 2],
+            "breach_ratio": [0.5, 0.5, 0.5],
+        },
+        index=pd.Index(["balanced", "benchmark_a", "overall"], name="portfolio"),
+    )
+
+
 def test_build_phase1_report_markdown_contains_key_sections() -> None:
     performance_summary = _sample_frame()
     turnover_summary = pd.DataFrame(
@@ -197,6 +208,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         rebalance_reason_table=_sample_rebalance_reason_table(),
         risk_limit_checks=_sample_risk_limit_checks(),
         risk_limit_breaches=_sample_risk_limit_breaches(),
+        risk_limit_breach_summary=_sample_risk_limit_breach_summary(),
         run_configuration=_sample_run_configuration(),
         notes=["IAGG failed the liquidity filter"],
     )
@@ -215,6 +227,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "## Recent Rebalance Events" in report
     assert "## Risk Limit Checks" in report
     assert "## Risk Limit Breaches" in report
+    assert "## Risk Limit Breach Summary" in report
     assert "## Data Quality Summary" in report
     assert "## Run Configuration" in report
     assert "config\\etf_universe.yaml" in report
@@ -222,6 +235,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "12.00%" in report
     assert "25.00%" in report
     assert "30.00%" in report
+    assert "50.00%" in report
     assert "calendar+drift" in report
 
 
@@ -304,6 +318,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
         rebalance_reason_table=_sample_rebalance_reason_table(),
         risk_limit_checks=_sample_risk_limit_checks(),
         risk_limit_breaches=_sample_risk_limit_breaches(),
+        risk_limit_breach_summary=_sample_risk_limit_breach_summary(),
         notes=["Backtest universe mode: liquidity_filtered"],
     )
 
@@ -318,6 +333,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "<h2>Recent Rebalance Events</h2>" in report
     assert "<h2>Risk Limit Checks</h2>" in report
     assert "<h2>Risk Limit Breaches</h2>" in report
+    assert "<h2>Risk Limit Breach Summary</h2>" in report
     assert "<h2>Data Quality Summary</h2>" in report
     assert "<h2>Run Configuration</h2>" in report
     assert "config\\etf_universe.yaml" in report
@@ -325,6 +341,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "12.00%" in report
     assert "25.00%" in report
     assert "30.00%" in report
+    assert "50.00%" in report
     assert "calendar+drift" in report
 
 
@@ -478,6 +495,7 @@ def test_write_phase1_report_creates_markdown_file() -> None:
             run_configuration=_sample_run_configuration(),
             risk_limit_checks=_sample_risk_limit_checks(),
             risk_limit_breaches=_sample_risk_limit_breaches(),
+            risk_limit_breach_summary=_sample_risk_limit_breach_summary(),
             notes=None,
         )
         assert result.exists()
@@ -565,6 +583,7 @@ def test_write_phase1_html_report_creates_html_file() -> None:
             run_configuration=_sample_run_configuration(),
             risk_limit_checks=_sample_risk_limit_checks(),
             risk_limit_breaches=_sample_risk_limit_breaches(),
+            risk_limit_breach_summary=_sample_risk_limit_breach_summary(),
             notes=None,
         )
         assert result.exists()

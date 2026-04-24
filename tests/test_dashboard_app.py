@@ -97,6 +97,14 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         ).to_csv(table_dir / "risk_limit_breaches.csv")
         pd.DataFrame(
             {
+                "total_enabled_checks": [2],
+                "breached_checks": [1],
+                "breach_ratio": [0.5],
+            },
+            index=pd.Index(["balanced"], name="portfolio"),
+        ).to_csv(table_dir / "risk_limit_breach_summary.csv")
+        pd.DataFrame(
+            {
                 "balanced": ["none", "calendar", "calendar+drift"],
                 "benchmark_a": ["calendar", "none", "drift"],
             },
@@ -164,6 +172,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Trend Filter Summary" in html
         assert "Risk Limit Checks" in html
         assert "Risk Limit Breaches" in html
+        assert "Risk Limit Breach Summary" in html
         assert "66.67%" in html
         assert "Recent Rebalance Reasons" in html
         assert "Rebalance Reason Summary" in html
@@ -223,6 +232,14 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
                 },
                 index=pd.Index(["balanced:max_drawdown"]),
             ),
+            "risk_limit_breach_summary": pd.DataFrame(
+                {
+                    "total_enabled_checks": [2],
+                    "breached_checks": [1],
+                    "breach_ratio": [0.5],
+                },
+                index=pd.Index(["balanced"]),
+            ),
             "rebalance_reason": pd.DataFrame({"balanced": ["calendar+drift"]}, index=pd.Index(["2024-01-04"])),
             "rebalance_reason_summary": pd.DataFrame(
                 {"rebalance_ratio": [2.0 / 3.0], "top_reason": ["calendar"]},
@@ -257,6 +274,7 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["risk_limit_checks"].loc["balanced:max_drawdown", "threshold"] == "25.00%"
     assert tables["risk_limit_checks"].loc["balanced:max_drawdown", "observed"] == "-20.00%"
     assert tables["risk_limit_breaches"].loc["balanced:max_drawdown", "observed"] == "-30.00%"
+    assert tables["risk_limit_breach_summary"].loc["balanced", "breach_ratio"] == "50.00%"
     assert tables["rebalance_reason"].iloc[0]["balanced"] == "calendar+drift"
     assert tables["rebalance_reason_summary"].loc["balanced", "rebalance_ratio"] == "66.67%"
     assert tables["etf_summary"].loc["VTI", "average_dollar_volume"] == "1000000"

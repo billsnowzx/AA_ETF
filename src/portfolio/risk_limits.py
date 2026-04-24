@@ -103,3 +103,49 @@ def find_risk_limit_breaches(risk_limit_checks: pd.DataFrame) -> pd.DataFrame:
     if "breach" not in risk_limit_checks.columns:
         return pd.DataFrame(columns=risk_limit_checks.columns)
     return risk_limit_checks.loc[risk_limit_checks["breach"].astype(bool)].copy()
+
+
+def build_risk_limit_breach_summary(risk_limit_checks: pd.DataFrame) -> pd.DataFrame:
+    """Build a compact breach summary table by portfolio plus an overall row."""
+    if risk_limit_checks.empty or "portfolio" not in risk_limit_checks.columns:
+        return pd.DataFrame(
+            columns=[
+                "portfolio",
+                "total_enabled_checks",
+                "breached_checks",
+                "breach_ratio",
+            ]
+        )
+
+    checks = risk_limit_checks.copy()
+    enabled_mask = checks.get("limit_enabled", False).astype(bool)
+    checks = checks.loc[enabled_mask]
+
+    rows: list[dict[str, object]] = []
+    grouped = checks.groupby("portfolio") if not checks.empty else []
+    for portfolio, frame in grouped:
+        total_enabled = int(len(frame))
+        breached = int(frame["breach"].astype(bool).sum()) if "breach" in frame.columns else 0
+        rows.append(
+            {
+                "portfolio": portfolio,
+                "total_enabled_checks": total_enabled,
+                "breached_checks": breached,
+                "breach_ratio": float(breached / total_enabled) if total_enabled > 0 else 0.0,
+            }
+        )
+
+    total_enabled_overall = int(len(checks))
+    breached_overall = int(checks["breach"].astype(bool).sum()) if "breach" in checks.columns else 0
+    rows.append(
+        {
+            "portfolio": "overall",
+            "total_enabled_checks": total_enabled_overall,
+            "breached_checks": breached_overall,
+            "breach_ratio": (
+                float(breached_overall / total_enabled_overall) if total_enabled_overall > 0 else 0.0
+            ),
+        }
+    )
+
+    return pd.DataFrame(rows).set_index("portfolio")

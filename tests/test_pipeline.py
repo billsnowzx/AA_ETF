@@ -217,6 +217,17 @@ def test_main_fail_on_missing_outputs_raises_runtime_error(monkeypatch) -> None:
     )
     monkeypatch.setattr("run_pipeline.write_risk_limit_output", lambda *args, **kwargs: Path("outputs/tables/risk_limit_checks.csv"))
     monkeypatch.setattr("run_pipeline.write_risk_limit_breaches_output", lambda *args, **kwargs: Path("outputs/tables/risk_limit_breaches.csv"))
+    monkeypatch.setattr(
+        "run_pipeline.build_risk_limit_breach_summary",
+        lambda *args, **kwargs: pd.DataFrame(
+            {"total_enabled_checks": [1], "breached_checks": [0], "breach_ratio": [0.0]},
+            index=pd.Index(["overall"], name="portfolio"),
+        ),
+    )
+    monkeypatch.setattr(
+        "run_pipeline.write_risk_limit_breach_summary_output",
+        lambda *args, **kwargs: Path("outputs/tables/risk_limit_breach_summary.csv"),
+    )
     monkeypatch.setattr("run_pipeline.find_risk_limit_breaches", lambda *args, **kwargs: pd.DataFrame())
     monkeypatch.setattr(
         "run_pipeline.build_run_configuration_summary",
@@ -399,6 +410,17 @@ def test_main_passes_rebalance_reason_table_to_reports(monkeypatch) -> None:
     )
     monkeypatch.setattr("run_pipeline.write_risk_limit_output", lambda *args, **kwargs: Path("outputs/tables/risk_limit_checks.csv"))
     monkeypatch.setattr("run_pipeline.write_risk_limit_breaches_output", lambda *args, **kwargs: Path("outputs/tables/risk_limit_breaches.csv"))
+    monkeypatch.setattr(
+        "run_pipeline.build_risk_limit_breach_summary",
+        lambda *args, **kwargs: pd.DataFrame(
+            {"total_enabled_checks": [1], "breached_checks": [0], "breach_ratio": [0.0]},
+            index=pd.Index(["overall"], name="portfolio"),
+        ),
+    )
+    monkeypatch.setattr(
+        "run_pipeline.write_risk_limit_breach_summary_output",
+        lambda *args, **kwargs: Path("outputs/tables/risk_limit_breach_summary.csv"),
+    )
     monkeypatch.setattr("run_pipeline.find_risk_limit_breaches", lambda *args, **kwargs: pd.DataFrame())
     monkeypatch.setattr(
         "run_pipeline.build_run_configuration_summary",
@@ -430,20 +452,25 @@ def test_main_passes_rebalance_reason_table_to_reports(monkeypatch) -> None:
     html_table = captured_html_kwargs["rebalance_reason_table"]
     markdown_risk_limits = captured_markdown_kwargs["risk_limit_checks"]
     markdown_risk_limit_breaches = captured_markdown_kwargs["risk_limit_breaches"]
+    markdown_risk_limit_breach_summary = captured_markdown_kwargs["risk_limit_breach_summary"]
     html_risk_limits = captured_html_kwargs["risk_limit_checks"]
     html_risk_limit_breaches = captured_html_kwargs["risk_limit_breaches"]
+    html_risk_limit_breach_summary = captured_html_kwargs["risk_limit_breach_summary"]
     assert isinstance(markdown_table, pd.DataFrame)
     assert isinstance(html_table, pd.DataFrame)
     assert isinstance(markdown_risk_limits, pd.DataFrame)
     assert isinstance(markdown_risk_limit_breaches, pd.DataFrame)
+    assert isinstance(markdown_risk_limit_breach_summary, pd.DataFrame)
     assert isinstance(html_risk_limits, pd.DataFrame)
     assert isinstance(html_risk_limit_breaches, pd.DataFrame)
+    assert isinstance(html_risk_limit_breach_summary, pd.DataFrame)
     assert markdown_table.columns.tolist() == ["balanced", "benchmark_a"]
     assert markdown_table["balanced"].tolist() == ["initial", "calendar"]
     assert markdown_table["benchmark_a"].tolist() == ["none", "drift"]
     pd.testing.assert_frame_equal(markdown_table, html_table)
     pd.testing.assert_frame_equal(markdown_risk_limits, html_risk_limits)
     pd.testing.assert_frame_equal(markdown_risk_limit_breaches, html_risk_limit_breaches)
+    pd.testing.assert_frame_equal(markdown_risk_limit_breach_summary, html_risk_limit_breach_summary)
 
 
 def test_main_fail_on_risk_limit_breach_raises_runtime_error(monkeypatch) -> None:
@@ -572,6 +599,17 @@ def test_main_fail_on_risk_limit_breach_raises_runtime_error(monkeypatch) -> Non
     )
     monkeypatch.setattr("run_pipeline.write_risk_limit_output", lambda *args, **kwargs: Path("outputs/tables/risk_limit_checks.csv"))
     monkeypatch.setattr("run_pipeline.write_risk_limit_breaches_output", lambda *args, **kwargs: Path("outputs/tables/risk_limit_breaches.csv"))
+    monkeypatch.setattr(
+        "run_pipeline.build_risk_limit_breach_summary",
+        lambda *args, **kwargs: pd.DataFrame(
+            {"total_enabled_checks": [1], "breached_checks": [1], "breach_ratio": [1.0]},
+            index=pd.Index(["overall"], name="portfolio"),
+        ),
+    )
+    monkeypatch.setattr(
+        "run_pipeline.write_risk_limit_breach_summary_output",
+        lambda *args, **kwargs: Path("outputs/tables/risk_limit_breach_summary.csv"),
+    )
     monkeypatch.setattr(
         "run_pipeline.build_run_configuration_summary",
         lambda *args, **kwargs: pd.DataFrame({"value": ["2024-01-01"]}, index=["start"]),
