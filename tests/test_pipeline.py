@@ -229,6 +229,7 @@ def test_main_fail_on_missing_outputs_raises_runtime_error(monkeypatch) -> None:
         lambda *args, **kwargs: Path("outputs/tables/risk_limit_breach_summary.csv"),
     )
     monkeypatch.setattr("run_pipeline.find_risk_limit_breaches", lambda *args, **kwargs: pd.DataFrame())
+    monkeypatch.setattr("run_pipeline.validate_risk_limit_artifacts", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         "run_pipeline.build_run_configuration_summary",
         lambda *args, **kwargs: pd.DataFrame({"value": ["2024-01-01"]}, index=["start"]),
@@ -422,6 +423,7 @@ def test_main_passes_rebalance_reason_table_to_reports(monkeypatch) -> None:
         lambda *args, **kwargs: Path("outputs/tables/risk_limit_breach_summary.csv"),
     )
     monkeypatch.setattr("run_pipeline.find_risk_limit_breaches", lambda *args, **kwargs: pd.DataFrame())
+    monkeypatch.setattr("run_pipeline.validate_risk_limit_artifacts", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         "run_pipeline.build_run_configuration_summary",
         lambda *args, **kwargs: pd.DataFrame({"value": ["2024-01-01"]}, index=["start"]),
@@ -597,6 +599,7 @@ def test_main_fail_on_risk_limit_breach_raises_runtime_error(monkeypatch) -> Non
         "run_pipeline.find_risk_limit_breaches",
         lambda checks: checks.loc[checks["breach"]],
     )
+    monkeypatch.setattr("run_pipeline.validate_risk_limit_artifacts", lambda *args, **kwargs: None)
     monkeypatch.setattr("run_pipeline.write_risk_limit_output", lambda *args, **kwargs: Path("outputs/tables/risk_limit_checks.csv"))
     monkeypatch.setattr("run_pipeline.write_risk_limit_breaches_output", lambda *args, **kwargs: Path("outputs/tables/risk_limit_breaches.csv"))
     monkeypatch.setattr(

@@ -22,6 +22,7 @@ from run_pipeline import (
     build_rolling_metric_outputs,
     build_return_table,
     build_turnover_summary,
+    validate_risk_limit_artifacts,
     collect_table_output_paths,
     collect_required_backtest_tickers,
     resolve_backtest_tickers,
@@ -540,3 +541,41 @@ def test_find_empty_output_inventory_entries_returns_only_existing_empty_rows() 
     assert len(empty) == 1
     assert empty["name"].tolist() == ["balanced_phase1_report"]
     assert empty["size_bytes"].tolist() == [0]
+
+
+def test_validate_risk_limit_artifacts_accepts_matching_detail_and_summary() -> None:
+    breaches = pd.DataFrame(
+        [
+            {"portfolio": "balanced", "metric": "max_drawdown"},
+            {"portfolio": "benchmark_a", "metric": "annualized_volatility"},
+        ]
+    )
+    summary = pd.DataFrame(
+        {
+            "total_enabled_checks": [2, 2, 4],
+            "breached_checks": [1, 1, 2],
+            "breach_ratio": [0.5, 0.5, 0.5],
+        },
+        index=pd.Index(["balanced", "benchmark_a", "overall"], name="portfolio"),
+    )
+
+    validate_risk_limit_artifacts(breaches, summary)
+
+
+def test_validate_risk_limit_artifacts_raises_on_mismatched_counts() -> None:
+    breaches = pd.DataFrame([{"portfolio": "balanced", "metric": "max_drawdown"}])
+    summary = pd.DataFrame(
+        {
+            "total_enabled_checks": [2, 2],
+            "breached_checks": [1, 2],
+            "breach_ratio": [0.5, 1.0],
+        },
+        index=pd.Index(["balanced", "overall"], name="portfolio"),
+    )
+
+    try:
+        validate_risk_limit_artifacts(breaches, summary)
+    except ValueError as exc:
+        assert "overall breached_checks" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for mismatched risk-limit artifact counts.")

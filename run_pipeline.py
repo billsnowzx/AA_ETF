@@ -634,6 +634,49 @@ def write_risk_limit_breach_summary_output(
     return risk_limit_breach_summary_path
 
 
+def validate_risk_limit_artifacts(
+    risk_limit_breaches: pd.DataFrame,
+    risk_limit_breach_summary: pd.DataFrame,
+) -> None:
+    """Validate consistency between risk-limit breach detail and summary artifacts."""
+    if risk_limit_breach_summary.empty:
+        if not risk_limit_breaches.empty:
+            raise ValueError("Risk-limit artifact validation failed: breaches exist but summary is empty.")
+        return
+
+    if "overall" not in risk_limit_breach_summary.index:
+        raise ValueError("Risk-limit artifact validation failed: summary must include 'overall' row.")
+
+    required_columns = {"total_enabled_checks", "breached_checks", "breach_ratio"}
+    missing_columns = required_columns - set(risk_limit_breach_summary.columns)
+    if missing_columns:
+        raise ValueError(
+            "Risk-limit artifact validation failed: summary is missing required columns "
+            f"{sorted(missing_columns)}."
+        )
+
+    overall_breached_checks = int(float(risk_limit_breach_summary.loc["overall", "breached_checks"]))
+    detail_breached_checks = int(len(risk_limit_breaches))
+    if overall_breached_checks != detail_breached_checks:
+        raise ValueError(
+            "Risk-limit artifact validation failed: overall breached_checks does not match breach detail count "
+            f"({overall_breached_checks} != {detail_breached_checks})."
+        )
+
+    for portfolio, summary_row in risk_limit_breach_summary.drop(index="overall", errors="ignore").iterrows():
+        expected = int(float(summary_row["breached_checks"]))
+        actual = (
+            int((risk_limit_breaches["portfolio"].astype(str) == str(portfolio)).sum())
+            if not risk_limit_breaches.empty and "portfolio" in risk_limit_breaches.columns
+            else 0
+        )
+        if expected != actual:
+            raise ValueError(
+                "Risk-limit artifact validation failed: per-portfolio breached_checks mismatch for "
+                f"{portfolio} ({expected} != {actual})."
+            )
+
+
 def collect_table_output_paths(output_dir: str | Path) -> dict[str, Path]:
     """Collect generated table output files for the pipeline manifest."""
     output_path = Path(output_dir)
@@ -975,6 +1018,7 @@ def main() -> None:
     risk_limit_path = write_risk_limit_output(risk_limit_checks, args.output_dir)
     risk_limit_breaches = find_risk_limit_breaches(risk_limit_checks)
     risk_limit_breach_summary = build_risk_limit_breach_summary(risk_limit_checks)
+    validate_risk_limit_artifacts(risk_limit_breaches, risk_limit_breach_summary)
     risk_limit_breaches_path = write_risk_limit_breaches_output(risk_limit_breaches, args.output_dir)
     risk_limit_breach_summary_path = write_risk_limit_breach_summary_output(
         risk_limit_breach_summary, args.output_dir
