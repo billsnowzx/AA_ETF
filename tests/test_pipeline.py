@@ -471,9 +471,11 @@ def test_main_passes_rebalance_reason_table_to_reports(monkeypatch) -> None:
     markdown_risk_limits = captured_markdown_kwargs["risk_limit_checks"]
     markdown_risk_limit_breaches = captured_markdown_kwargs["risk_limit_breaches"]
     markdown_risk_limit_breach_summary = captured_markdown_kwargs["risk_limit_breach_summary"]
+    markdown_pipeline_health_summary = captured_markdown_kwargs["pipeline_health_summary"]
     html_risk_limits = captured_html_kwargs["risk_limit_checks"]
     html_risk_limit_breaches = captured_html_kwargs["risk_limit_breaches"]
     html_risk_limit_breach_summary = captured_html_kwargs["risk_limit_breach_summary"]
+    html_pipeline_health_summary = captured_html_kwargs["pipeline_health_summary"]
     assert isinstance(markdown_table, pd.DataFrame)
     assert isinstance(html_table, pd.DataFrame)
     assert isinstance(markdown_risk_limits, pd.DataFrame)
@@ -482,6 +484,8 @@ def test_main_passes_rebalance_reason_table_to_reports(monkeypatch) -> None:
     assert isinstance(html_risk_limits, pd.DataFrame)
     assert isinstance(html_risk_limit_breaches, pd.DataFrame)
     assert isinstance(html_risk_limit_breach_summary, pd.DataFrame)
+    assert isinstance(markdown_pipeline_health_summary, pd.DataFrame)
+    assert isinstance(html_pipeline_health_summary, pd.DataFrame)
     assert markdown_table.columns.tolist() == ["balanced", "benchmark_a"]
     assert markdown_table["balanced"].tolist() == ["initial", "calendar"]
     assert markdown_table["benchmark_a"].tolist() == ["none", "drift"]
@@ -489,6 +493,7 @@ def test_main_passes_rebalance_reason_table_to_reports(monkeypatch) -> None:
     pd.testing.assert_frame_equal(markdown_risk_limits, html_risk_limits)
     pd.testing.assert_frame_equal(markdown_risk_limit_breaches, html_risk_limit_breaches)
     pd.testing.assert_frame_equal(markdown_risk_limit_breach_summary, html_risk_limit_breach_summary)
+    pd.testing.assert_frame_equal(markdown_pipeline_health_summary, html_pipeline_health_summary)
 
 
 def test_main_fail_on_risk_limit_breach_raises_runtime_error(monkeypatch) -> None:

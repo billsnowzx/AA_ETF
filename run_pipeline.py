@@ -1165,6 +1165,7 @@ def main() -> None:
         risk_limit_checks=risk_limit_checks,
         risk_limit_breaches=risk_limit_breaches,
         risk_limit_breach_summary=risk_limit_breach_summary,
+        pipeline_health_summary=None,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1191,6 +1192,7 @@ def main() -> None:
         risk_limit_checks=risk_limit_checks,
         risk_limit_breaches=risk_limit_breaches,
         risk_limit_breach_summary=risk_limit_breach_summary,
+        pipeline_health_summary=None,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1246,6 +1248,62 @@ def main() -> None:
     pipeline_health_summary_path = write_pipeline_health_summary(
         pipeline_health_summary, args.output_dir
     )
+    report_path = write_phase1_report(
+        strategy_name=strategy_name,
+        performance_summary=performance_summary,
+        turnover_summary=turnover_summary,
+        annual_return_table=strategy_result["annual_return_table"],
+        benchmark_comparisons=strategy_result["benchmark_comparisons"],
+        benchmark_annual_excess_returns=strategy_result["benchmark_annual_excess_returns"],
+        benchmark_drawdown_comparisons=strategy_result["benchmark_drawdown_comparisons"],
+        liquidity_table=liquidity_table,
+        etf_summary=etf_summary,
+        data_quality_summary=data_quality_summary,
+        covariance_matrix=risk_outputs["covariance_matrix"],
+        correlation_matrix=risk_outputs["correlation_matrix"],
+        correlation_pairs=risk_outputs["correlation_pairs"],
+        chart_paths=chart_paths,
+        output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.md",
+        report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
+        trend_filter_summary=trend_filter_summary,
+        rolling_metric_snapshot=rolling_metric_snapshot,
+        rebalance_reason_table=rebalance_reason_table,
+        risk_limit_checks=risk_limit_checks,
+        risk_limit_breaches=risk_limit_breaches,
+        risk_limit_breach_summary=risk_limit_breach_summary,
+        pipeline_health_summary=pipeline_health_summary,
+        run_configuration=run_configuration,
+        notes=report_notes,
+    )
+    html_report_path = write_phase1_html_report(
+        strategy_name=strategy_name,
+        performance_summary=performance_summary,
+        turnover_summary=turnover_summary,
+        annual_return_table=strategy_result["annual_return_table"],
+        benchmark_comparisons=strategy_result["benchmark_comparisons"],
+        benchmark_annual_excess_returns=strategy_result["benchmark_annual_excess_returns"],
+        benchmark_drawdown_comparisons=strategy_result["benchmark_drawdown_comparisons"],
+        liquidity_table=liquidity_table,
+        etf_summary=etf_summary,
+        data_quality_summary=data_quality_summary,
+        covariance_matrix=risk_outputs["covariance_matrix"],
+        correlation_matrix=risk_outputs["correlation_matrix"],
+        correlation_pairs=risk_outputs["correlation_pairs"],
+        chart_paths=chart_paths,
+        output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.html",
+        report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
+        trend_filter_summary=trend_filter_summary,
+        rolling_metric_snapshot=rolling_metric_snapshot,
+        rebalance_reason_table=rebalance_reason_table,
+        risk_limit_checks=risk_limit_checks,
+        risk_limit_breaches=risk_limit_breaches,
+        risk_limit_breach_summary=risk_limit_breach_summary,
+        pipeline_health_summary=pipeline_health_summary,
+        run_configuration=run_configuration,
+        notes=report_notes,
+    )
+    LOGGER.info("Updated Phase 1 report with pipeline health summary at %s", report_path)
+    LOGGER.info("Updated Phase 1 HTML report with pipeline health summary at %s", html_report_path)
     if not missing_outputs.empty:
         missing_labels = ", ".join(
             f"{row.output_type}:{row.name}"
