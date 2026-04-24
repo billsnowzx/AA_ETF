@@ -36,6 +36,7 @@ def _build_manifest_summary(manifest: dict) -> pd.DataFrame:
     parameters = manifest.get("parameters", {})
     universes = manifest.get("universes", {})
     strategy = manifest.get("strategy", {})
+    risk_limits = manifest.get("risk_limits", {})
     config_files = manifest.get("config_files", {})
     rows = {
         "run_completed_at": manifest.get("run_completed_at", "n/a"),
@@ -47,6 +48,9 @@ def _build_manifest_summary(manifest: dict) -> pd.DataFrame:
         "enabled_tickers": ", ".join(universes.get("enabled_tickers", [])),
         "liquid_tickers": ", ".join(universes.get("liquid_tickers", [])),
         "backtest_tickers": ", ".join(universes.get("backtest_tickers", [])),
+        "risk_limits_has_breach": risk_limits.get("has_breach", "n/a"),
+        "risk_limits_breach_count": risk_limits.get("breach_count", "n/a"),
+        "risk_limits_breached_portfolios": ", ".join(risk_limits.get("breached_portfolios", [])),
     }
     rows.update(
         {

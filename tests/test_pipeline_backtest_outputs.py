@@ -360,6 +360,19 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         run_completed_at="2026-04-20T00:00:00+00:00",
         as_of_date="2024-12-31",
         seed=7,
+        risk_limit_breaches=pd.DataFrame(
+            {
+                "portfolio": ["balanced"],
+                "metric": ["max_drawdown"],
+                "breach": [True],
+            }
+        ),
+        risk_limit_breach_summary=pd.DataFrame(
+            {
+                "breach_ratio": [0.5, 0.5],
+            },
+            index=pd.Index(["balanced", "overall"], name="portfolio"),
+        ),
     )
 
     output_dir = Path("data/cache") / f"test_manifest_{uuid.uuid4().hex}"
@@ -376,6 +389,11 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         assert loaded["config_files"]["risk_limits"] == "config\\risk_limits.yaml"
         assert loaded["universes"]["backtest_tickers"] == ["VTI", "AGG"]
         assert loaded["strategy"]["ending_nav"] == 1.25
+        assert loaded["risk_limits"]["has_breach"] is True
+        assert loaded["risk_limits"]["breach_count"] == 1
+        assert loaded["risk_limits"]["breached_portfolios"] == ["balanced"]
+        assert loaded["risk_limits"]["breach_ratio_by_portfolio"]["balanced"] == 0.5
+        assert loaded["risk_limits"]["breach_ratio_by_portfolio"]["overall"] == 0.5
         assert loaded["outputs"]["tables"]["performance_summary"] == "outputs\\tables\\performance_summary.csv"
         assert loaded["outputs"]["tables"]["output_inventory"] == "outputs\\tables\\output_inventory.csv"
         assert loaded["outputs"]["figures"]["nav_chart"] == "outputs\\figures\\balanced_nav.png"

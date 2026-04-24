@@ -729,10 +729,25 @@ def build_pipeline_manifest(
     run_completed_at: str | None = None,
     as_of_date: str | None = None,
     seed: int | None = None,
+    risk_limit_breaches: pd.DataFrame | None = None,
+    risk_limit_breach_summary: pd.DataFrame | None = None,
 ) -> dict:
     """Build a reproducibility manifest for a completed Phase 1 pipeline run."""
     completed_at = run_completed_at or pd.Timestamp.utcnow().isoformat()
     strategy_row = performance_summary.loc[strategy_name]
+    breach_table = risk_limit_breaches if risk_limit_breaches is not None else pd.DataFrame()
+    breach_summary = risk_limit_breach_summary if risk_limit_breach_summary is not None else pd.DataFrame()
+    breach_count = int(len(breach_table))
+    has_breach = breach_count > 0
+    breached_portfolios: list[str] = []
+    if not breach_table.empty and "portfolio" in breach_table.columns:
+        breached_portfolios = sorted({str(value) for value in breach_table["portfolio"].dropna().tolist()})
+
+    breach_ratio_by_portfolio: dict[str, float] = {}
+    if not breach_summary.empty and "breach_ratio" in breach_summary.columns:
+        for portfolio, ratio in breach_summary["breach_ratio"].items():
+            breach_ratio_by_portfolio[str(portfolio)] = float(ratio)
+
     return {
         "run_completed_at": completed_at,
         "date_range": {
@@ -761,6 +776,12 @@ def build_pipeline_manifest(
             "annualized_return": float(strategy_row["annualized_return"]),
             "annualized_volatility": float(strategy_row["annualized_volatility"]),
             "max_drawdown": float(strategy_row["max_drawdown"]),
+        },
+        "risk_limits": {
+            "has_breach": has_breach,
+            "breach_count": breach_count,
+            "breached_portfolios": breached_portfolios,
+            "breach_ratio_by_portfolio": breach_ratio_by_portfolio,
         },
         "directories": {
             "raw": str(Path(raw_dir)),
@@ -1081,6 +1102,8 @@ def main() -> None:
         report_dir=args.report_dir,
         as_of_date=args.as_of_date,
         seed=args.seed,
+        risk_limit_breaches=risk_limit_breaches,
+        risk_limit_breach_summary=risk_limit_breach_summary,
     )
     write_pipeline_manifest(manifest, args.output_dir)
     output_inventory = build_output_inventory(
@@ -1142,6 +1165,8 @@ def main() -> None:
         report_dir=args.report_dir,
         as_of_date=args.as_of_date,
         seed=args.seed,
+        risk_limit_breaches=risk_limit_breaches,
+        risk_limit_breach_summary=risk_limit_breach_summary,
     )
     write_pipeline_manifest(manifest, args.output_dir)
 

@@ -139,6 +139,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
                     "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
                     "parameters": {"backtest_universe_mode": "liquidity_filtered", "rolling_window": 63},
                     "strategy": {"name": "balanced", "ending_nav": 1.25},
+                    "risk_limits": {"has_breach": True, "breach_count": 2, "breached_portfolios": ["balanced"]},
                     "config_files": {"universe": "config/etf_universe.yaml"},
                     "universes": {
                         "enabled_tickers": ["VTI", "AGG"],
@@ -167,6 +168,8 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Output Inventory" in html
         assert "performance_summary" in html
         assert "liquidity_filtered" in html
+        assert "risk_limits_has_breach" in html
+        assert "True" in html
         assert "config/etf_universe.yaml" in html
         assert "Data Quality Summary" in html
         assert "Trend Filter Summary" in html
@@ -286,6 +289,7 @@ def test_build_manifest_summary_flattens_key_run_context() -> None:
         "date_range": {"start": "2024-01-01", "end": "2024-12-31"},
         "parameters": {"backtest_universe_mode": "liquidity_filtered", "rolling_window": 63},
         "strategy": {"name": "balanced", "ending_nav": 1.25},
+        "risk_limits": {"has_breach": True, "breach_count": 2, "breached_portfolios": ["balanced"]},
         "config_files": {"universe": "config/etf_universe.yaml"},
         "universes": {
             "enabled_tickers": ["VTI", "AGG"],
@@ -299,6 +303,9 @@ def test_build_manifest_summary_flattens_key_run_context() -> None:
     assert summary.loc["date_range", "value"] == "2024-01-01 to 2024-12-31"
     assert summary.loc["backtest_universe_mode", "value"] == "liquidity_filtered"
     assert summary.loc["backtest_tickers", "value"] == "VTI, AGG"
+    assert summary.loc["risk_limits_has_breach", "value"] is True
+    assert summary.loc["risk_limits_breach_count", "value"] == 2
+    assert summary.loc["risk_limits_breached_portfolios", "value"] == "balanced"
     assert summary.loc["config_universe", "value"] == "config/etf_universe.yaml"
 
 
