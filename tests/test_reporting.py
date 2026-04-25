@@ -194,6 +194,26 @@ def _sample_macro_regime_summary() -> pd.DataFrame:
     )
 
 
+def _sample_portfolio_score_summary() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "return_score": [20.0],
+            "risk_control_score": [18.0],
+            "risk_adjusted_score": [15.0],
+            "stability_score": [10.0],
+            "executability_score": [12.0],
+            "total_score": [75.0],
+            "score_pct": [0.75],
+            "monthly_win_rate": [0.70],
+            "annual_win_rate": [0.80],
+            "avg_turnover": [0.03],
+            "total_transaction_cost_drag": [0.003],
+            "rank": [1],
+        },
+        index=pd.Index(["balanced"], name="portfolio"),
+    )
+
+
 def test_build_phase1_report_markdown_contains_key_sections() -> None:
     performance_summary = _sample_frame()
     turnover_summary = pd.DataFrame(
@@ -284,6 +304,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         risk_limit_breach_summary=_sample_risk_limit_breach_summary(),
         pipeline_health_summary=_sample_pipeline_health_summary(),
         portfolio_risk_contribution=_sample_portfolio_risk_contribution(),
+        portfolio_score_summary=_sample_portfolio_score_summary(),
         macro_regime_summary=_sample_macro_regime_summary(),
         run_configuration=_sample_run_configuration(),
         notes=["IAGG failed the liquidity filter"],
@@ -309,6 +330,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "## Pipeline Health Summary" in report
     assert "## Macro Regime Summary" in report
     assert "## Portfolio Risk Contribution" in report
+    assert "## Portfolio Score Summary" in report
     assert "## Data Quality Summary" in report
     assert "## Run Configuration" in report
     assert "config\\etf_universe.yaml" in report
@@ -323,6 +345,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "run_passed_quality_gates" in report
     assert "percent_risk_contribution" in report
     assert "composite_regime" in report
+    assert "75.0000" in report
 
 
 def test_build_phase1_report_html_contains_key_sections() -> None:
@@ -412,6 +435,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
         risk_limit_breach_summary=_sample_risk_limit_breach_summary(),
         pipeline_health_summary=_sample_pipeline_health_summary(),
         portfolio_risk_contribution=_sample_portfolio_risk_contribution(),
+        portfolio_score_summary=_sample_portfolio_score_summary(),
         macro_regime_summary=_sample_macro_regime_summary(),
         notes=["Backtest universe mode: liquidity_filtered"],
     )
@@ -433,6 +457,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "<h2>Pipeline Health Summary</h2>" in report
     assert "<h2>Macro Regime Summary</h2>" in report
     assert "<h2>Portfolio Risk Contribution</h2>" in report
+    assert "<h2>Portfolio Score Summary</h2>" in report
     assert "<h2>Data Quality Summary</h2>" in report
     assert "<h2>Run Configuration</h2>" in report
     assert "config\\etf_universe.yaml" in report
@@ -447,6 +472,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "run_passed_quality_gates" in report
     assert "percent_risk_contribution" in report
     assert "composite_regime" in report
+    assert "75.0000" in report
 
 
 def test_build_rebalance_reason_summary_counts_trigger_types() -> None:

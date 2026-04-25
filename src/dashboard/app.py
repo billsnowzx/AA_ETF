@@ -145,6 +145,24 @@ def _format_dashboard_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.Da
         if "marginal_contribution_to_risk" in frame.columns:
             frame["marginal_contribution_to_risk"] = frame["marginal_contribution_to_risk"].map(_format_decimal)
 
+    if "portfolio_score_summary" in formatted:
+        frame = formatted["portfolio_score_summary"]
+        for column in [
+            "return_score",
+            "risk_control_score",
+            "risk_adjusted_score",
+            "stability_score",
+            "executability_score",
+            "total_score",
+        ]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_decimal)
+        for column in ["score_pct", "monthly_win_rate", "annual_win_rate", "avg_turnover", "total_transaction_cost_drag"]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_percent)
+        if "rank" in frame.columns:
+            frame["rank"] = frame["rank"].map(_format_integer)
+
     if "etf_summary" in formatted:
         frame = formatted["etf_summary"]
         for column in ["average_dollar_volume", "latest_rolling_average_dollar_volume"]:
@@ -294,6 +312,7 @@ def build_dashboard_html(
     top_correlations = _read_csv_if_exists(output_path / "top_correlation_pairs.csv", index_col=None)
     asset_risk_snapshot = _read_csv_if_exists(output_path / "asset_risk_snapshot.csv")
     portfolio_risk_contribution = _read_csv_if_exists(output_path / "portfolio_risk_contribution.csv")
+    portfolio_score_summary = _read_csv_if_exists(output_path / "portfolio_score_summary.csv")
     etf_summary = _read_csv_if_exists(output_path / "etf_summary.csv")
     etf_metadata_summary = _read_csv_if_exists(output_path / "etf_metadata_summary.csv")
     data_quality_summary = _read_csv_if_exists(output_path / "data_quality_summary.csv")
@@ -322,6 +341,7 @@ def build_dashboard_html(
             "top_correlation_pairs": top_correlations,
             "asset_risk_snapshot": asset_risk_snapshot,
             "portfolio_risk_contribution": portfolio_risk_contribution,
+            "portfolio_score_summary": portfolio_score_summary,
             "etf_summary": etf_summary,
             "etf_metadata_summary": etf_metadata_summary,
             "data_quality_summary": data_quality_summary,
@@ -350,6 +370,7 @@ def build_dashboard_html(
     top_correlations = formatted_tables["top_correlation_pairs"]
     asset_risk_snapshot = formatted_tables["asset_risk_snapshot"]
     portfolio_risk_contribution = formatted_tables["portfolio_risk_contribution"]
+    portfolio_score_summary = formatted_tables["portfolio_score_summary"]
     etf_summary = formatted_tables["etf_summary"]
     etf_metadata_summary = formatted_tables["etf_metadata_summary"]
     data_quality_summary = formatted_tables["data_quality_summary"]
@@ -538,6 +559,10 @@ def build_dashboard_html(
       <section class="card">
         <h2>Portfolio Risk Contribution</h2>
         {dataframe_to_html_table(portfolio_risk_contribution)}
+      </section>
+      <section class="card">
+        <h2>Portfolio Score Summary</h2>
+        {dataframe_to_html_table(portfolio_score_summary)}
       </section>
       <section class="card">
         <h2>ETF Summary</h2>

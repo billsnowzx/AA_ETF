@@ -22,6 +22,7 @@ REQUIRED_TABLES = [
     "risk_limit_breaches.csv",
     "risk_limit_breach_summary.csv",
     "portfolio_risk_contribution.csv",
+    "portfolio_score_summary.csv",
     "rolling_volatility.csv",
     "rolling_sharpe.csv",
     "rolling_correlation.csv",

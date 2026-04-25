@@ -55,6 +55,23 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
             },
             index=pd.Index(["VTI"], name="asset"),
         ).to_csv(table_dir / "portfolio_risk_contribution.csv")
+        pd.DataFrame(
+            {
+                "return_score": [20.0],
+                "risk_control_score": [18.0],
+                "risk_adjusted_score": [15.0],
+                "stability_score": [10.0],
+                "executability_score": [12.0],
+                "total_score": [75.0],
+                "score_pct": [0.75],
+                "monthly_win_rate": [0.70],
+                "annual_win_rate": [0.80],
+                "avg_turnover": [0.03],
+                "total_transaction_cost_drag": [0.003],
+                "rank": [1],
+            },
+            index=pd.Index(["balanced"], name="portfolio"),
+        ).to_csv(table_dir / "portfolio_score_summary.csv")
         pd.DataFrame({"balanced": [0.10]}, index=pd.Index(["2024-01-01"], name="date")).to_csv(
             table_dir / "rolling_volatility.csv"
         )
@@ -252,6 +269,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Risk Limit Breaches" in html
         assert "Risk Limit Breach Summary" in html
         assert "Portfolio Risk Contribution" in html
+        assert "Portfolio Score Summary" in html
         assert "balanced_risk_contribution.png" in html
         assert "balanced_mctr.png" in html
         assert "66.67%" in html
@@ -289,6 +307,14 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
                     "portfolio_volatility": [0.088],
                 },
                 index=pd.Index(["VTI"]),
+            ),
+            "portfolio_score_summary": pd.DataFrame(
+                {
+                    "total_score": [75.0],
+                    "score_pct": [0.75],
+                    "rank": [1],
+                },
+                index=pd.Index(["balanced"]),
             ),
             "rolling_volatility": pd.DataFrame({"balanced": [0.10]}),
             "rolling_sharpe": pd.DataFrame({"balanced": [0.5]}),
@@ -384,6 +410,8 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["portfolio_risk_contribution"].loc["VTI", "weight"] == "60.00%"
     assert tables["portfolio_risk_contribution"].loc["VTI", "percent_risk_contribution"] == "81.82%"
     assert tables["portfolio_risk_contribution"].loc["VTI", "marginal_contribution_to_risk"] == "0.1200"
+    assert tables["portfolio_score_summary"].loc["balanced", "total_score"] == "75.0000"
+    assert tables["portfolio_score_summary"].loc["balanced", "score_pct"] == "75.00%"
     assert tables["rolling_volatility"].iloc[0]["balanced"] == "10.00%"
     assert tables["rolling_sharpe"].iloc[0]["balanced"] == "0.5000"
     assert tables["rolling_correlation"].iloc[0]["VTI_AGG_rolling_correlation"] == "0.2500"

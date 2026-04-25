@@ -124,6 +124,7 @@ This command will:
 - generate `benchmark_annual_excess_returns.csv` and `benchmark_drawdown_comparisons.csv`
 - generate `trend_filter_summary.csv`, `trend_filter_active.csv`, and `trend_filter_scales.csv`
 - generate `risk_switch_summary.csv`, `risk_switch_active.csv`, and `risk_switch_scales.csv`
+- generate `portfolio_score_summary.csv` with 100-point component scoring for strategy and benchmarks
 - generate `rebalance_reason.csv` with per-date rebalance trigger reasons
 - generate `risk_limit_checks.csv` with config-driven risk-limit audit checks
 - generate `rolling_volatility.csv`, `rolling_sharpe.csv`, and `drawdown_series.csv`

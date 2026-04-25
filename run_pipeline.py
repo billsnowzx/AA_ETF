@@ -43,6 +43,7 @@ from src.portfolio.policy import (
 from src.portfolio.rebalancer import load_standard_rebalance_frequency
 from src.portfolio.rebalancer import load_trend_filter_settings
 from src.portfolio.rebalancer import load_risk_switch_settings
+from src.portfolio.portfolio_scoring import build_portfolio_score_summary
 from src.portfolio.rebalancer import (
     load_rebalance_trigger_mode,
     load_drift_rule_enabled,
@@ -693,6 +694,28 @@ def build_risk_switch_summary(
             }
         ]
     ).set_index("portfolio")
+
+
+def write_portfolio_score_summary(
+    performance_summary: pd.DataFrame,
+    turnover_summary: pd.DataFrame,
+    return_table: pd.DataFrame,
+    rolling_sharpe_table: pd.DataFrame,
+    output_dir: str | Path,
+) -> Path:
+    """Persist portfolio-level score summary as an auditable CSV."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    portfolio_scores = build_portfolio_score_summary(
+        performance_summary=performance_summary,
+        turnover_summary=turnover_summary,
+        return_table=return_table,
+        rolling_sharpe_table=rolling_sharpe_table,
+    )
+    path = output_path / "portfolio_score_summary.csv"
+    portfolio_scores.to_csv(path, index=True)
+    LOGGER.info("Saved portfolio score summary to %s", path)
+    return path
 
 
 def build_risk_matrix_outputs(asset_returns: pd.DataFrame) -> dict[str, pd.DataFrame]:
@@ -1478,6 +1501,14 @@ def main() -> None:
 
     performance_summary = build_performance_summary(strategy_name, strategy_result, benchmark_results)
     turnover_summary = build_turnover_summary(strategy_name, strategy_result, benchmark_results)
+    portfolio_score_summary_path = write_portfolio_score_summary(
+        performance_summary=performance_summary,
+        turnover_summary=turnover_summary,
+        return_table=return_table,
+        rolling_sharpe_table=rolling_outputs["rolling_sharpe"],
+        output_dir=args.output_dir,
+    )
+    portfolio_score_summary = pd.read_csv(portfolio_score_summary_path, index_col=0)
     trend_filter_summary = build_trend_filter_summary(strategy_name, strategy_result)
     risk_switch_summary = build_risk_switch_summary(strategy_name, strategy_result)
     rebalance_reason_table = build_rebalance_reason_table(strategy_name, strategy_result, benchmark_results)
@@ -1575,6 +1606,7 @@ def main() -> None:
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=None,
         portfolio_risk_contribution=portfolio_risk_contribution,
+        portfolio_score_summary=portfolio_score_summary,
         macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=report_notes,
@@ -1606,6 +1638,7 @@ def main() -> None:
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=None,
         portfolio_risk_contribution=portfolio_risk_contribution,
+        portfolio_score_summary=portfolio_score_summary,
         macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=report_notes,
@@ -1691,6 +1724,7 @@ def main() -> None:
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=pipeline_health_summary,
         portfolio_risk_contribution=portfolio_risk_contribution,
+        portfolio_score_summary=portfolio_score_summary,
         macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=report_notes,
@@ -1722,6 +1756,7 @@ def main() -> None:
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=pipeline_health_summary,
         portfolio_risk_contribution=portfolio_risk_contribution,
+        portfolio_score_summary=portfolio_score_summary,
         macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=report_notes,
@@ -1760,6 +1795,7 @@ def main() -> None:
     final_table_paths["risk_limit_checks"] = risk_limit_path
     final_table_paths["risk_limit_breaches"] = risk_limit_breaches_path
     final_table_paths["risk_limit_breach_summary"] = risk_limit_breach_summary_path
+    final_table_paths["portfolio_score_summary"] = portfolio_score_summary_path
     manifest = build_pipeline_manifest(
         start=args.start,
         end=args.end,
