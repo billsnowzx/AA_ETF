@@ -45,6 +45,12 @@ def test_write_phase1_chart_outputs_creates_required_pngs() -> None:
         },
         index=index,
     )
+    rolling_correlation = pd.DataFrame(
+        {
+            "VTI_AGG_rolling_correlation": [None, 0.2, 0.1, -0.1],
+        },
+        index=index,
+    )
     risk_contribution = pd.DataFrame(
         {
             "weight": [0.6, 0.4],
@@ -65,6 +71,7 @@ def test_write_phase1_chart_outputs_creates_required_pngs() -> None:
             output_dir,
             rolling_volatility_table=rolling_volatility,
             rolling_sharpe_table=rolling_sharpe,
+            rolling_correlation_table=rolling_correlation,
             risk_contribution_table=risk_contribution,
         )
         assert chart_paths["nav_chart"].exists()
@@ -73,6 +80,7 @@ def test_write_phase1_chart_outputs_creates_required_pngs() -> None:
         assert chart_paths["correlation_heatmap"].exists()
         assert chart_paths["rolling_volatility_chart"].exists()
         assert chart_paths["rolling_sharpe_chart"].exists()
+        assert chart_paths["rolling_correlation_chart"].exists()
         assert chart_paths["risk_contribution_chart"].exists()
         assert chart_paths["mctr_chart"].exists()
     finally:

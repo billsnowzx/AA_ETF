@@ -21,6 +21,7 @@ from run_pipeline import (
     build_pipeline_manifest,
     build_portfolio_risk_contribution_table,
     build_risk_matrix_outputs,
+    build_rolling_correlation_output,
     build_rolling_metric_outputs,
     build_return_table,
     build_turnover_summary,
@@ -273,6 +274,12 @@ def test_build_summary_tables_and_write_outputs() -> None:
     risk_outputs = build_risk_matrix_outputs(asset_returns)
     risk_contribution = build_portfolio_risk_contribution_table(strategy_result, risk_outputs["covariance_matrix"])
     rolling_outputs = build_rolling_metric_outputs(return_table, window=2, periods_per_year=2)
+    rolling_outputs["rolling_correlation"] = build_rolling_correlation_output(
+        asset_returns=asset_returns,
+        window=2,
+        left="VTI",
+        right="AGG",
+    )
 
     output_dir = Path("data/cache") / f"test_pipeline_outputs_{uuid.uuid4().hex}"
     try:
@@ -296,6 +303,7 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert "percent_risk_contribution" in risk_contribution.columns
         assert "rolling_volatility" in rolling_outputs
         assert "rolling_sharpe" in rolling_outputs
+        assert "rolling_correlation" in rolling_outputs
         write_rolling_metric_outputs(rolling_outputs, output_dir)
         assert (output_dir / "performance_summary.csv").exists()
         assert (output_dir / "annual_return_table.csv").exists()
@@ -315,6 +323,7 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert (output_dir / "trend_filter_scales.csv").exists()
         assert (output_dir / "rolling_volatility.csv").exists()
         assert (output_dir / "rolling_sharpe.csv").exists()
+        assert (output_dir / "rolling_correlation.csv").exists()
         assert (output_dir / "drawdown_series.csv").exists()
 
         rebalance_reason = pd.read_csv(output_dir / "rebalance_reason.csv", index_col=0)

@@ -214,6 +214,11 @@ def _format_dashboard_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.Da
         for column in frame.columns:
             frame[column] = frame[column].map(_format_decimal)
 
+    if "rolling_correlation" in formatted:
+        frame = formatted["rolling_correlation"]
+        for column in frame.columns:
+            frame[column] = frame[column].map(_format_decimal)
+
     if "manifest_summary" in formatted:
         frame = formatted["manifest_summary"].astype(object)
         if "value" in frame.columns and "ending_nav" in frame.index:
@@ -295,6 +300,7 @@ def build_dashboard_html(
     macro_regime_summary = _read_csv_if_exists(output_path / "macro_regime_summary.csv", index_col=None)
     rolling_volatility = _read_csv_if_exists(output_path / "rolling_volatility.csv")
     rolling_sharpe = _read_csv_if_exists(output_path / "rolling_sharpe.csv")
+    rolling_correlation = _read_csv_if_exists(output_path / "rolling_correlation.csv")
     manifest_summary = _build_manifest_summary(_read_json_if_exists(output_path / "pipeline_manifest.json"))
     formatted_tables = _format_dashboard_tables(
         {
@@ -321,6 +327,7 @@ def build_dashboard_html(
             "macro_regime_summary": macro_regime_summary,
             "rolling_volatility": rolling_volatility.tail(5),
             "rolling_sharpe": rolling_sharpe.tail(5),
+            "rolling_correlation": rolling_correlation.tail(5),
             "manifest_summary": manifest_summary,
         }
     )
@@ -347,6 +354,7 @@ def build_dashboard_html(
     macro_regime_summary = formatted_tables["macro_regime_summary"]
     rolling_volatility = formatted_tables["rolling_volatility"]
     rolling_sharpe = formatted_tables["rolling_sharpe"]
+    rolling_correlation = formatted_tables["rolling_correlation"]
     manifest_summary = formatted_tables["manifest_summary"]
 
     report_links = []
@@ -365,6 +373,7 @@ def build_dashboard_html(
         ("Annual Returns", "balanced_annual_returns.png"),
         ("Rolling Volatility", "balanced_rolling_volatility.png"),
         ("Rolling Sharpe", "balanced_rolling_sharpe.png"),
+        ("Rolling Correlation", "balanced_rolling_correlation.png"),
         ("Correlation Heatmap", "correlation_heatmap.png"),
         ("Risk Contribution", "balanced_risk_contribution.png"),
         ("MCTR", "balanced_mctr.png"),
@@ -560,6 +569,10 @@ def build_dashboard_html(
       <section class="card">
         <h2>Latest Rolling Sharpe</h2>
         {dataframe_to_html_table(rolling_sharpe)}
+      </section>
+      <section class="card">
+        <h2>Latest Rolling Correlation</h2>
+        {dataframe_to_html_table(rolling_correlation)}
       </section>
     </div>
 

@@ -229,6 +229,7 @@ def test_main_fail_on_missing_outputs_raises_runtime_error(monkeypatch) -> None:
         lambda *args, **kwargs: {
             "rolling_volatility": pd.DataFrame({"balanced": [0.0, 0.0]}, index=index),
             "rolling_sharpe": pd.DataFrame({"balanced": [0.0, 0.0]}, index=index),
+            "rolling_correlation": pd.DataFrame({"VTI_AGG_rolling_correlation": [0.0, 0.0]}, index=index),
             "drawdown_series": pd.DataFrame({"balanced": [0.0, 0.0]}, index=index),
         },
     )
@@ -446,6 +447,7 @@ def test_main_passes_rebalance_reason_table_to_reports(monkeypatch) -> None:
         lambda *args, **kwargs: {
             "rolling_volatility": pd.DataFrame({"balanced": [0.0, 0.0], "benchmark_a": [0.0, 0.0]}, index=index),
             "rolling_sharpe": pd.DataFrame({"balanced": [0.0, 0.0], "benchmark_a": [0.0, 0.0]}, index=index),
+            "rolling_correlation": pd.DataFrame({"VTI_AGG_rolling_correlation": [0.0, 0.0]}, index=index),
             "drawdown_series": pd.DataFrame({"balanced": [0.0, 0.0], "benchmark_a": [0.0, 0.0]}, index=index),
         },
     )
@@ -663,6 +665,7 @@ def test_main_fail_on_risk_limit_breach_raises_runtime_error(monkeypatch) -> Non
         lambda *args, **kwargs: {
             "rolling_volatility": pd.DataFrame({"balanced": [0.0, 0.0]}, index=index),
             "rolling_sharpe": pd.DataFrame({"balanced": [0.0, 0.0]}, index=index),
+            "rolling_correlation": pd.DataFrame({"VTI_AGG_rolling_correlation": [0.0, 0.0]}, index=index),
             "drawdown_series": pd.DataFrame({"balanced": [0.0, 0.0]}, index=index),
         },
     )

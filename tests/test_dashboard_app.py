@@ -61,6 +61,10 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         pd.DataFrame({"balanced": [0.5]}, index=pd.Index(["2024-01-01"], name="date")).to_csv(
             table_dir / "rolling_sharpe.csv"
         )
+        pd.DataFrame(
+            {"VTI_AGG_rolling_correlation": [0.35]},
+            index=pd.Index(["2024-01-01"], name="date"),
+        ).to_csv(table_dir / "rolling_correlation.csv")
         pd.DataFrame({"asset_class": ["us_equity"]}, index=pd.Index(["VTI"])).to_csv(table_dir / "etf_summary.csv")
         pd.DataFrame(
             {
@@ -216,6 +220,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "balanced_phase1_report.html" in html
         assert "10.00%" in html
         assert "Latest Rolling Volatility" in html
+        assert "Latest Rolling Correlation" in html
         assert "Run Manifest" in html
         assert "Run Configuration" in html
         assert "config\\risk_limits.yaml" in html
@@ -276,6 +281,7 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
             ),
             "rolling_volatility": pd.DataFrame({"balanced": [0.10]}),
             "rolling_sharpe": pd.DataFrame({"balanced": [0.5]}),
+            "rolling_correlation": pd.DataFrame({"VTI_AGG_rolling_correlation": [0.25]}),
             "manifest_summary": pd.DataFrame({"value": [1.25]}, index=pd.Index(["ending_nav"])),
             "run_configuration": pd.DataFrame({"value": ["config\\risk_limits.yaml"]}, index=pd.Index(["config_risk_limits"])),
             "output_inventory": pd.DataFrame({"name": ["performance_summary"], "size_bytes": [1234]}),
@@ -360,6 +366,7 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["portfolio_risk_contribution"].loc["VTI", "marginal_contribution_to_risk"] == "0.1200"
     assert tables["rolling_volatility"].iloc[0]["balanced"] == "10.00%"
     assert tables["rolling_sharpe"].iloc[0]["balanced"] == "0.5000"
+    assert tables["rolling_correlation"].iloc[0]["VTI_AGG_rolling_correlation"] == "0.2500"
     assert tables["manifest_summary"].loc["ending_nav", "value"] == "1.2500"
     assert tables["run_configuration"].loc["config_risk_limits", "value"] == "config\\risk_limits.yaml"
     assert tables["output_inventory"].iloc[0]["size_bytes"] == "1234"

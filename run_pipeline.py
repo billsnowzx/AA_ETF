@@ -17,6 +17,7 @@ from src.analytics.correlation import (
     covariance_matrix,
     matrix_to_long_table,
     return_matrix_from_prices,
+    rolling_correlation,
 )
 from src.analytics.drawdown import drawdown_from_returns
 from src.analytics.risk import risk_contribution_table, rolling_sharpe_ratio, rolling_volatility
@@ -761,6 +762,31 @@ def build_rolling_metric_outputs(
     }
 
 
+def build_rolling_correlation_output(
+    asset_returns: pd.DataFrame,
+    window: int = 63,
+    left: str = "VTI",
+    right: str = "AGG",
+) -> pd.DataFrame:
+    """Build a rolling correlation table for a selected asset pair."""
+    column_name = f"{left}_{right}_rolling_correlation"
+    if asset_returns.empty:
+        return pd.DataFrame(columns=[column_name])
+    if left not in asset_returns.columns or right not in asset_returns.columns:
+        return pd.DataFrame(columns=[column_name], index=asset_returns.index)
+
+    series = rolling_correlation(
+        asset_returns,
+        left=left,
+        right=right,
+        window=window,
+        min_periods=window,
+    )
+    table = pd.DataFrame({column_name: series})
+    table.index.name = "date"
+    return table
+
+
 def write_rolling_metric_outputs(
     rolling_outputs: dict[str, pd.DataFrame],
     output_dir: str | Path,
@@ -771,9 +797,14 @@ def write_rolling_metric_outputs(
     rolling_outputs["rolling_volatility"].to_csv(output_path / "rolling_volatility.csv", index=True)
     rolling_outputs["rolling_sharpe"].to_csv(output_path / "rolling_sharpe.csv", index=True)
     rolling_outputs["drawdown_series"].to_csv(output_path / "drawdown_series.csv", index=True)
+    rolling_correlation_table = rolling_outputs.get("rolling_correlation")
+    if isinstance(rolling_correlation_table, pd.DataFrame):
+        rolling_correlation_table.to_csv(output_path / "rolling_correlation.csv", index=True)
     LOGGER.info("Saved rolling volatility to %s", output_path / "rolling_volatility.csv")
     LOGGER.info("Saved rolling Sharpe to %s", output_path / "rolling_sharpe.csv")
     LOGGER.info("Saved drawdown series to %s", output_path / "drawdown_series.csv")
+    if isinstance(rolling_correlation_table, pd.DataFrame):
+        LOGGER.info("Saved rolling correlation to %s", output_path / "rolling_correlation.csv")
 
 
 def write_run_configuration_output(
@@ -1304,6 +1335,12 @@ def main() -> None:
     )
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
     rolling_outputs = build_rolling_metric_outputs(return_table, window=args.rolling_window)
+    rolling_outputs["rolling_correlation"] = build_rolling_correlation_output(
+        asset_returns=asset_returns,
+        window=args.rolling_window,
+        left="VTI",
+        right="AGG",
+    )
     write_rolling_metric_outputs(rolling_outputs, args.output_dir)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
     portfolio_risk_contribution = build_portfolio_risk_contribution_table(
@@ -1318,6 +1355,7 @@ def main() -> None:
         args.figure_dir,
         rolling_volatility_table=rolling_outputs["rolling_volatility"],
         rolling_sharpe_table=rolling_outputs["rolling_sharpe"],
+        rolling_correlation_table=rolling_outputs["rolling_correlation"],
         risk_contribution_table=portfolio_risk_contribution,
     )
     LOGGER.info("Saved Phase 1 charts: %s", chart_paths)
@@ -1397,6 +1435,7 @@ def main() -> None:
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
+        rolling_correlation=rolling_outputs["rolling_correlation"],
         rebalance_reason_table=rebalance_reason_table,
         risk_limit_checks=risk_limit_checks,
         risk_limit_breaches=risk_limit_breaches,
@@ -1426,6 +1465,7 @@ def main() -> None:
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
+        rolling_correlation=rolling_outputs["rolling_correlation"],
         rebalance_reason_table=rebalance_reason_table,
         risk_limit_checks=risk_limit_checks,
         risk_limit_breaches=risk_limit_breaches,
@@ -1509,6 +1549,7 @@ def main() -> None:
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
+        rolling_correlation=rolling_outputs["rolling_correlation"],
         rebalance_reason_table=rebalance_reason_table,
         risk_limit_checks=risk_limit_checks,
         risk_limit_breaches=risk_limit_breaches,
@@ -1538,6 +1579,7 @@ def main() -> None:
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         trend_filter_summary=trend_filter_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
+        rolling_correlation=rolling_outputs["rolling_correlation"],
         rebalance_reason_table=rebalance_reason_table,
         risk_limit_checks=risk_limit_checks,
         risk_limit_breaches=risk_limit_breaches,

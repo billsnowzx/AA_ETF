@@ -28,7 +28,6 @@ Phase 1 includes:
 Phase 1 intentionally excludes:
 
 - Optimization modules such as risk parity and Black-Litterman
-- Optimization-aware overlays and macro regime logic
 - Advanced optimization workflows and production dashboarding
 
 ## Repository layout
@@ -126,6 +125,7 @@ This command will:
 - generate `rebalance_reason.csv` with per-date rebalance trigger reasons
 - generate `risk_limit_checks.csv` with config-driven risk-limit audit checks
 - generate `rolling_volatility.csv`, `rolling_sharpe.csv`, and `drawdown_series.csv`
+- generate `rolling_correlation.csv` for the equity-bond regime proxy (VTI vs AGG)
 - generate `covariance_matrix.csv`, `correlation_matrix.csv`, `covariance_pairs.csv`, and `correlation_pairs.csv`
 - generate `top_correlation_pairs.csv` and `asset_risk_snapshot.csv`
 - generate `portfolio_risk_contribution.csv` with latest weights, MCTR, absolute risk contribution, and percent risk contribution
@@ -134,6 +134,7 @@ This command will:
 - generate `output_inventory.csv` with existence and file-size checks for generated artifacts
 - generate `pipeline_manifest.json` with run parameters, selected universes, and output paths
 - generate the required Phase 1 charts under `outputs/figures/`, including risk contribution and MCTR charts
+- generate `balanced_rolling_correlation.png` for rolling equity-bond correlation monitoring
 - generate Markdown and HTML reports under `outputs/reports/`
 
 ## Running the local dashboard

@@ -134,6 +134,7 @@ def write_phase1_chart_outputs(
     output_dir: str | Path,
     rolling_volatility_table: pd.DataFrame | None = None,
     rolling_sharpe_table: pd.DataFrame | None = None,
+    rolling_correlation_table: pd.DataFrame | None = None,
     risk_contribution_table: pd.DataFrame | None = None,
 ) -> dict[str, Path]:
     """Write the required Phase 1 charts to disk."""
@@ -150,6 +151,8 @@ def write_phase1_chart_outputs(
         chart_paths["rolling_volatility_chart"] = output_path / f"{strategy_name}_rolling_volatility.png"
     if rolling_sharpe_table is not None and not rolling_sharpe_table.empty:
         chart_paths["rolling_sharpe_chart"] = output_path / f"{strategy_name}_rolling_sharpe.png"
+    if rolling_correlation_table is not None and not rolling_correlation_table.empty:
+        chart_paths["rolling_correlation_chart"] = output_path / f"{strategy_name}_rolling_correlation.png"
     if risk_contribution_table is not None and not risk_contribution_table.empty:
         chart_paths["risk_contribution_chart"] = output_path / f"{strategy_name}_risk_contribution.png"
         chart_paths["mctr_chart"] = output_path / f"{strategy_name}_mctr.png"
@@ -171,6 +174,13 @@ def write_phase1_chart_outputs(
             chart_paths["rolling_sharpe_chart"],
             title="Rolling Sharpe Ratio",
             ylabel="Sharpe Ratio",
+        )
+    if "rolling_correlation_chart" in chart_paths:
+        save_rolling_metric_chart(
+            rolling_correlation_table,
+            chart_paths["rolling_correlation_chart"],
+            title="Rolling Correlation (VTI vs AGG)",
+            ylabel="Correlation",
         )
     if "risk_contribution_chart" in chart_paths:
         save_risk_contribution_chart(risk_contribution_table, chart_paths["risk_contribution_chart"])
