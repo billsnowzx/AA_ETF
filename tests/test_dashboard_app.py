@@ -64,6 +64,15 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         pd.DataFrame({"asset_class": ["us_equity"]}, index=pd.Index(["VTI"])).to_csv(table_dir / "etf_summary.csv")
         pd.DataFrame(
             {
+                "metadata_available": [True],
+                "long_name": ["VTI Name"],
+                "expense_ratio": [0.0003],
+                "total_assets": [1_000_000_000],
+            },
+            index=pd.Index(["VTI"], name="ticker"),
+        ).to_csv(table_dir / "etf_metadata_summary.csv")
+        pd.DataFrame(
+            {
                 "start_date": ["2024-01-02"],
                 "end_date": ["2024-01-03"],
                 "observations": [2],
@@ -199,6 +208,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "True" in html
         assert "config/etf_universe.yaml" in html
         assert "Data Quality Summary" in html
+        assert "ETF Metadata Summary" in html
         assert "Trend Filter Summary" in html
         assert "Risk Limit Checks" in html
         assert "Risk Limit Breaches" in html

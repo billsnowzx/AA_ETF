@@ -24,6 +24,7 @@ REQUIRED_TABLES = [
     "rolling_sharpe.csv",
     "output_inventory.csv",
     "pipeline_health_summary.csv",
+    "etf_metadata_summary.csv",
     "pipeline_manifest.json",
 ]
 

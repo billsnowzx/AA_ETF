@@ -22,6 +22,7 @@ from src.analytics.drawdown import drawdown_from_returns
 from src.analytics.risk import risk_contribution_table, rolling_sharpe_ratio, rolling_volatility
 from src.backtest.engine import run_fixed_weight_backtest
 from src.data.clean_data import batch_clean_price_frames, build_data_quality_summary
+from src.data.fetch_etf_metadata import fetch_etf_metadata, save_etf_metadata_snapshots, save_etf_metadata_summary
 from src.data.fetch_macro_data import fetch_macro_series, save_macro_series_per_symbol
 from src.data.fetch_prices import fetch_prices
 from src.dashboard.plots import write_phase1_chart_outputs
@@ -205,6 +206,19 @@ def write_macro_outputs(
     macro_series.to_csv(macro_path, index=True)
     LOGGER.info("Saved macro observation summary to %s", macro_path)
     return macro_path
+
+
+def write_etf_metadata_outputs(
+    metadata_summary: pd.DataFrame,
+    output_dir: str | Path,
+) -> Path:
+    """Persist ETF metadata summary for pipeline reporting and dashboarding."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    metadata_path = output_path / "etf_metadata_summary.csv"
+    save_etf_metadata_summary(metadata_summary, metadata_path)
+    LOGGER.info("Saved ETF metadata summary to %s", metadata_path)
+    return metadata_path
 
 
 def run_strategy_backtests(
@@ -885,6 +899,7 @@ def build_pipeline_manifest(
     config_paths: dict[str, str | Path],
     output_dir: str | Path,
     raw_dir: str | Path,
+    metadata_dir: str | Path,
     processed_dir: str | Path,
     macro_dir: str | Path,
     figure_dir: str | Path,
@@ -948,6 +963,7 @@ def build_pipeline_manifest(
         },
         "directories": {
             "raw": str(Path(raw_dir)),
+            "metadata": str(Path(metadata_dir)),
             "processed": str(Path(processed_dir)),
             "macro": str(Path(macro_dir)),
             "tables": str(Path(output_dir)),
@@ -984,6 +1000,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--start", required=True, help="Inclusive start date in YYYY-MM-DD format.")
     parser.add_argument("--end", default=None, help="Exclusive end date in YYYY-MM-DD format.")
     parser.add_argument("--raw-dir", default="data/raw")
+    parser.add_argument("--metadata-dir", default="data/raw/metadata")
     parser.add_argument("--processed-dir", default="data/processed")
     parser.add_argument("--macro-dir", default="data/macro")
     parser.add_argument("--output-dir", default="outputs/tables")
@@ -1068,6 +1085,9 @@ def main() -> None:
 
     tickers = load_enabled_tickers(args.universe_config)
     LOGGER.info("Loaded %s enabled tickers from %s", len(tickers), args.universe_config)
+    etf_metadata_summary = fetch_etf_metadata(tickers)
+    save_etf_metadata_snapshots(etf_metadata_summary, output_dir=args.metadata_dir)
+    etf_metadata_summary_path = write_etf_metadata_outputs(etf_metadata_summary, args.output_dir)
 
     raw_frames = fetch_prices(
         tickers=tickers,
@@ -1294,6 +1314,7 @@ def main() -> None:
         config_paths=config_paths,
         output_dir=args.output_dir,
         raw_dir=args.raw_dir,
+        metadata_dir=args.metadata_dir,
         processed_dir=args.processed_dir,
         macro_dir=args.macro_dir,
         figure_dir=args.figure_dir,
@@ -1406,6 +1427,7 @@ def main() -> None:
         LOGGER.warning("Output inventory found empty artifacts: %s", empty_labels)
 
     final_table_paths = collect_table_output_paths(args.output_dir)
+    final_table_paths["etf_metadata_summary"] = etf_metadata_summary_path
     final_table_paths["macro_observation_summary"] = macro_summary_path
     final_table_paths["output_inventory"] = inventory_path
     final_table_paths["pipeline_health_summary"] = pipeline_health_summary_path
@@ -1429,6 +1451,7 @@ def main() -> None:
         config_paths=config_paths,
         output_dir=args.output_dir,
         raw_dir=args.raw_dir,
+        metadata_dir=args.metadata_dir,
         processed_dir=args.processed_dir,
         macro_dir=args.macro_dir,
         figure_dir=args.figure_dir,

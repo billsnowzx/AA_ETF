@@ -274,6 +274,7 @@ def build_dashboard_html(
     asset_risk_snapshot = _read_csv_if_exists(output_path / "asset_risk_snapshot.csv")
     portfolio_risk_contribution = _read_csv_if_exists(output_path / "portfolio_risk_contribution.csv")
     etf_summary = _read_csv_if_exists(output_path / "etf_summary.csv")
+    etf_metadata_summary = _read_csv_if_exists(output_path / "etf_metadata_summary.csv")
     data_quality_summary = _read_csv_if_exists(output_path / "data_quality_summary.csv")
     trend_filter_summary = _read_csv_if_exists(output_path / "trend_filter_summary.csv")
     risk_limit_checks = _read_csv_if_exists(output_path / "risk_limit_checks.csv")
@@ -298,6 +299,7 @@ def build_dashboard_html(
             "asset_risk_snapshot": asset_risk_snapshot,
             "portfolio_risk_contribution": portfolio_risk_contribution,
             "etf_summary": etf_summary,
+            "etf_metadata_summary": etf_metadata_summary,
             "data_quality_summary": data_quality_summary,
             "trend_filter_summary": trend_filter_summary,
             "risk_limit_checks": risk_limit_checks,
@@ -322,6 +324,7 @@ def build_dashboard_html(
     asset_risk_snapshot = formatted_tables["asset_risk_snapshot"]
     portfolio_risk_contribution = formatted_tables["portfolio_risk_contribution"]
     etf_summary = formatted_tables["etf_summary"]
+    etf_metadata_summary = formatted_tables["etf_metadata_summary"]
     data_quality_summary = formatted_tables["data_quality_summary"]
     trend_filter_summary = formatted_tables["trend_filter_summary"]
     risk_limit_checks = formatted_tables["risk_limit_checks"]
@@ -504,6 +507,10 @@ def build_dashboard_html(
       <section class="card">
         <h2>ETF Summary</h2>
         {dataframe_to_html_table(etf_summary)}
+      </section>
+      <section class="card">
+        <h2>ETF Metadata Summary</h2>
+        {dataframe_to_html_table(etf_metadata_summary)}
       </section>
       <section class="card">
         <h2>Data Quality Summary</h2>

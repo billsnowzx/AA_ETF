@@ -27,6 +27,7 @@ def test_argument_parser_exposes_rolling_window_default_and_override() -> None:
     assert default_args.rolling_window == 63
     assert default_args.risk_limits_config == "config/risk_limits.yaml"
     assert default_args.macro_dir == "data/macro"
+    assert default_args.metadata_dir == "data/raw/metadata"
     assert default_args.download_retries == 3
     assert default_args.download_retry_delay == 1.0
     assert default_args.fail_on_missing_outputs is False
@@ -146,6 +147,15 @@ def test_main_fail_on_missing_outputs_raises_runtime_error(monkeypatch) -> None:
     monkeypatch.setattr(
         "run_pipeline.write_data_quality_outputs",
         lambda *args, **kwargs: pd.DataFrame({"observations": [2]}, index=pd.Index(["VTI"], name="ticker")),
+    )
+    monkeypatch.setattr(
+        "run_pipeline.fetch_etf_metadata",
+        lambda *args, **kwargs: pd.DataFrame({"metadata_available": [True]}, index=pd.Index(["VTI"], name="ticker")),
+    )
+    monkeypatch.setattr("run_pipeline.save_etf_metadata_snapshots", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        "run_pipeline.write_etf_metadata_outputs",
+        lambda *args, **kwargs: Path("outputs/tables/etf_metadata_summary.csv"),
     )
     monkeypatch.setattr(
         "run_pipeline.fetch_macro_series",
@@ -354,6 +364,15 @@ def test_main_passes_rebalance_reason_table_to_reports(monkeypatch) -> None:
     monkeypatch.setattr(
         "run_pipeline.write_data_quality_outputs",
         lambda *args, **kwargs: pd.DataFrame({"observations": [2]}, index=pd.Index(["VTI"], name="ticker")),
+    )
+    monkeypatch.setattr(
+        "run_pipeline.fetch_etf_metadata",
+        lambda *args, **kwargs: pd.DataFrame({"metadata_available": [True]}, index=pd.Index(["VTI"], name="ticker")),
+    )
+    monkeypatch.setattr("run_pipeline.save_etf_metadata_snapshots", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        "run_pipeline.write_etf_metadata_outputs",
+        lambda *args, **kwargs: Path("outputs/tables/etf_metadata_summary.csv"),
     )
     monkeypatch.setattr(
         "run_pipeline.fetch_macro_series",
@@ -568,6 +587,15 @@ def test_main_fail_on_risk_limit_breach_raises_runtime_error(monkeypatch) -> Non
     monkeypatch.setattr(
         "run_pipeline.write_data_quality_outputs",
         lambda *args, **kwargs: pd.DataFrame({"observations": [2]}, index=pd.Index(["VTI"], name="ticker")),
+    )
+    monkeypatch.setattr(
+        "run_pipeline.fetch_etf_metadata",
+        lambda *args, **kwargs: pd.DataFrame({"metadata_available": [True]}, index=pd.Index(["VTI"], name="ticker")),
+    )
+    monkeypatch.setattr("run_pipeline.save_etf_metadata_snapshots", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        "run_pipeline.write_etf_metadata_outputs",
+        lambda *args, **kwargs: Path("outputs/tables/etf_metadata_summary.csv"),
     )
     monkeypatch.setattr(
         "run_pipeline.fetch_macro_series",

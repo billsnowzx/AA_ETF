@@ -21,6 +21,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--raw-dir", default="data/raw")
+    parser.add_argument("--metadata-dir", default="data/raw/metadata")
     parser.add_argument("--processed-dir", default="data/processed")
     parser.add_argument("--macro-dir", default="data/macro")
     parser.add_argument("--output-dir", default="outputs/tables")
@@ -50,6 +51,8 @@ def main() -> None:
         str(args.rolling_window),
         "--raw-dir",
         args.raw_dir,
+        "--metadata-dir",
+        args.metadata_dir,
         "--processed-dir",
         args.processed_dir,
         "--macro-dir",

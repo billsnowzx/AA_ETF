@@ -361,6 +361,7 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         },
         output_dir="outputs/tables",
         raw_dir="data/raw",
+        metadata_dir="data/raw/metadata",
         processed_dir="data/processed",
         macro_dir="data/macro",
         figure_dir="outputs/figures",
@@ -405,6 +406,7 @@ def test_build_and_write_pipeline_manifest_records_run_context() -> None:
         assert loaded["outputs"]["tables"]["performance_summary"] == "outputs\\tables\\performance_summary.csv"
         assert loaded["outputs"]["tables"]["output_inventory"] == "outputs\\tables\\output_inventory.csv"
         assert loaded["outputs"]["figures"]["nav_chart"] == "outputs\\figures\\balanced_nav.png"
+        assert loaded["directories"]["metadata"] == "data\\raw\\metadata"
         assert loaded["directories"]["macro"] == "data\\macro"
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
