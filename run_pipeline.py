@@ -785,6 +785,9 @@ def write_backtest_outputs(
     rebalance_reason_summary = build_rebalance_reason_summary(rebalance_reason_table)
     nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
     return_table = build_return_table(strategy_name, strategy_result, benchmark_results)
+    turnover_history = build_turnover_history_table(strategy_name, strategy_result, benchmark_results)
+    transaction_cost_history = build_transaction_cost_history_table(strategy_name, strategy_result, benchmark_results)
+    rebalance_flags = build_rebalance_flag_table(strategy_name, strategy_result, benchmark_results)
     risk_outputs = build_risk_matrix_outputs(asset_returns)
     portfolio_risk_contribution = build_portfolio_risk_contribution_table(
         strategy_result,
@@ -801,8 +804,13 @@ def write_backtest_outputs(
     risk_switch_summary.to_csv(output_path / "risk_switch_summary.csv", index=True)
     nav_table.to_csv(output_path / "nav_series.csv", index=True)
     return_table.to_csv(output_path / "return_series.csv", index=True)
+    turnover_history.to_csv(output_path / "turnover_history.csv", index=True)
+    transaction_cost_history.to_csv(output_path / "transaction_cost_history.csv", index=True)
+    rebalance_flags.to_csv(output_path / "rebalance_flags.csv", index=True)
     rebalance_reason_table.to_csv(output_path / "rebalance_reason.csv", index=True)
     rebalance_reason_summary.to_csv(output_path / "rebalance_reason_summary.csv", index=True)
+    strategy_result["weights_start"].to_csv(output_path / "weights_start_history.csv", index=True)
+    strategy_result["weights_end"].to_csv(output_path / "weights_end_history.csv", index=True)
     policy_validation.to_csv(output_path / "backtest_universe_validation.csv", index=True)
     policy_summary.to_csv(output_path / "backtest_universe_policy_summary.csv", index=True)
     risk_outputs["covariance_matrix"].to_csv(output_path / "covariance_matrix.csv", index=True)
@@ -829,8 +837,13 @@ def write_backtest_outputs(
     LOGGER.info("Saved benchmark drawdown comparisons to %s", output_path / "benchmark_drawdown_comparisons.csv")
     LOGGER.info("Saved trend filter summary to %s", output_path / "trend_filter_summary.csv")
     LOGGER.info("Saved risk switch summary to %s", output_path / "risk_switch_summary.csv")
+    LOGGER.info("Saved turnover history to %s", output_path / "turnover_history.csv")
+    LOGGER.info("Saved transaction cost history to %s", output_path / "transaction_cost_history.csv")
+    LOGGER.info("Saved rebalance flags to %s", output_path / "rebalance_flags.csv")
     LOGGER.info("Saved rebalance reasons to %s", output_path / "rebalance_reason.csv")
     LOGGER.info("Saved rebalance reason summary to %s", output_path / "rebalance_reason_summary.csv")
+    LOGGER.info("Saved start-of-day weights to %s", output_path / "weights_start_history.csv")
+    LOGGER.info("Saved end-of-day weights to %s", output_path / "weights_end_history.csv")
     LOGGER.info("Saved covariance matrix to %s", output_path / "covariance_matrix.csv")
     LOGGER.info("Saved correlation matrix to %s", output_path / "correlation_matrix.csv")
     LOGGER.info("Saved top correlation pairs to %s", output_path / "top_correlation_pairs.csv")
@@ -870,6 +883,48 @@ def build_return_table(
         {
             strategy_name: strategy_result["portfolio_returns"],
             **{name: result["portfolio_returns"] for name, result in benchmark_results.items()},
+        }
+    )
+
+
+def build_turnover_history_table(
+    strategy_name: str,
+    strategy_result: dict[str, pd.Series | pd.DataFrame],
+    benchmark_results: dict[str, dict[str, pd.Series | pd.DataFrame]],
+) -> pd.DataFrame:
+    """Build a per-date turnover history table for strategy and benchmarks."""
+    return pd.DataFrame(
+        {
+            strategy_name: strategy_result["turnover"],
+            **{name: result["turnover"] for name, result in benchmark_results.items()},
+        }
+    )
+
+
+def build_transaction_cost_history_table(
+    strategy_name: str,
+    strategy_result: dict[str, pd.Series | pd.DataFrame],
+    benchmark_results: dict[str, dict[str, pd.Series | pd.DataFrame]],
+) -> pd.DataFrame:
+    """Build a per-date transaction-cost history table for strategy and benchmarks."""
+    return pd.DataFrame(
+        {
+            strategy_name: strategy_result["transaction_costs"],
+            **{name: result["transaction_costs"] for name, result in benchmark_results.items()},
+        }
+    )
+
+
+def build_rebalance_flag_table(
+    strategy_name: str,
+    strategy_result: dict[str, pd.Series | pd.DataFrame],
+    benchmark_results: dict[str, dict[str, pd.Series | pd.DataFrame]],
+) -> pd.DataFrame:
+    """Build a per-date rebalance-flag table for strategy and benchmarks."""
+    return pd.DataFrame(
+        {
+            strategy_name: strategy_result["rebalance_flags"],
+            **{name: result["rebalance_flags"] for name, result in benchmark_results.items()},
         }
     )
 
