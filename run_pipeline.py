@@ -208,6 +208,143 @@ def write_macro_outputs(
     return macro_path
 
 
+def build_macro_regime_summary(
+    macro_series: pd.DataFrame,
+    lookback_days: int = 63,
+) -> pd.DataFrame:
+    """Build a compact macro regime table from the latest observations."""
+    columns = [
+        "as_of_date",
+        "metric",
+        "latest_value",
+        "reference_value",
+        "signal",
+        "rule",
+    ]
+    if macro_series.empty:
+        return pd.DataFrame(columns=columns)
+
+    series = macro_series.copy().sort_index().dropna(how="all")
+    if series.empty:
+        return pd.DataFrame(columns=columns)
+
+    as_of_date = pd.Timestamp(series.index.max()).strftime("%Y-%m-%d")
+    lookback_window = max(int(lookback_days), 1)
+    rows: list[dict[str, object]] = []
+    signal_votes: list[str] = []
+
+    def _latest_non_null(column: str) -> float | None:
+        if column not in series.columns:
+            return None
+        values = pd.to_numeric(series[column], errors="coerce").dropna()
+        if values.empty:
+            return None
+        return float(values.iloc[-1])
+
+    def _rolling_median(column: str) -> float | None:
+        if column not in series.columns:
+            return None
+        values = pd.to_numeric(series[column], errors="coerce").dropna().tail(lookback_window)
+        if values.empty:
+            return None
+        return float(values.median())
+
+    vix_latest = _latest_non_null("vix")
+    if vix_latest is not None:
+        vix_signal = "risk_off" if vix_latest >= 25.0 else "risk_on"
+        signal_votes.append(vix_signal)
+        rows.append(
+            {
+                "as_of_date": as_of_date,
+                "metric": "vix",
+                "latest_value": vix_latest,
+                "reference_value": 25.0,
+                "signal": vix_signal,
+                "rule": "risk_off when latest VIX >= 25",
+            }
+        )
+
+    slope_latest = _latest_non_null("us_2s10s_slope")
+    if slope_latest is not None:
+        slope_signal = "risk_off" if slope_latest < 0.0 else "risk_on"
+        signal_votes.append(slope_signal)
+        rows.append(
+            {
+                "as_of_date": as_of_date,
+                "metric": "us_2s10s_slope",
+                "latest_value": slope_latest,
+                "reference_value": 0.0,
+                "signal": slope_signal,
+                "rule": "risk_off when latest 2s10s slope < 0",
+            }
+        )
+
+    credit_latest = _latest_non_null("hyg_lqd_ratio")
+    credit_reference = _rolling_median("hyg_lqd_ratio")
+    if credit_latest is not None and credit_reference is not None:
+        credit_signal = "risk_off" if credit_latest < credit_reference else "risk_on"
+        signal_votes.append(credit_signal)
+        rows.append(
+            {
+                "as_of_date": as_of_date,
+                "metric": "hyg_lqd_ratio",
+                "latest_value": credit_latest,
+                "reference_value": credit_reference,
+                "signal": credit_signal,
+                "rule": f"risk_off when latest HYG/LQD < {lookback_window}-day median",
+            }
+        )
+
+    usd_latest = _latest_non_null("usd_index")
+    usd_reference = _rolling_median("usd_index")
+    if usd_latest is not None and usd_reference is not None:
+        usd_signal = "risk_off" if usd_latest > usd_reference else "risk_on"
+        signal_votes.append(usd_signal)
+        rows.append(
+            {
+                "as_of_date": as_of_date,
+                "metric": "usd_index",
+                "latest_value": usd_latest,
+                "reference_value": usd_reference,
+                "signal": usd_signal,
+                "rule": f"risk_off when latest USD index > {lookback_window}-day median",
+            }
+        )
+
+    risk_off_votes = int(sum(vote == "risk_off" for vote in signal_votes))
+    risk_on_votes = int(sum(vote == "risk_on" for vote in signal_votes))
+    if risk_off_votes >= 2:
+        composite_signal = "risk_off"
+    elif risk_on_votes >= 2:
+        composite_signal = "risk_on"
+    else:
+        composite_signal = "mixed"
+    rows.append(
+        {
+            "as_of_date": as_of_date,
+            "metric": "composite_regime",
+            "latest_value": float(risk_off_votes),
+            "reference_value": float(len(signal_votes)),
+            "signal": composite_signal,
+            "rule": "risk_off if >=2 component risk_off signals; risk_on if >=2 risk_on; else mixed",
+        }
+    )
+    return pd.DataFrame(rows, columns=columns)
+
+
+def write_macro_regime_summary_output(
+    macro_regime_summary: pd.DataFrame,
+    output_dir: str | Path,
+) -> Path:
+    """Persist macro regime summary for pipeline reporting and dashboarding."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    regime_path = output_path / "macro_regime_summary.csv"
+    macro_regime_summary.to_csv(regime_path, index=False)
+    LOGGER.info("Saved macro regime summary to %s", regime_path)
+    return regime_path
+
+
 def write_etf_metadata_outputs(
     metadata_summary: pd.DataFrame,
     output_dir: str | Path,
@@ -1107,8 +1244,10 @@ def main() -> None:
         max_retries=args.download_retries,
         retry_delay_seconds=args.download_retry_delay,
     )
+    macro_regime_summary = build_macro_regime_summary(macro_series)
     save_macro_series_per_symbol(macro_series, output_dir=args.macro_dir)
     macro_summary_path = write_macro_outputs(macro_series, args.output_dir)
+    macro_regime_summary_path = write_macro_regime_summary_output(macro_regime_summary, args.output_dir)
 
     liquid_tickers, liquidity_table = filter_liquid_universe(clean_frames)
     etf_summary = score_etf_universe(
@@ -1264,6 +1403,7 @@ def main() -> None:
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=None,
         portfolio_risk_contribution=portfolio_risk_contribution,
+        macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1292,6 +1432,7 @@ def main() -> None:
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=None,
         portfolio_risk_contribution=portfolio_risk_contribution,
+        macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1374,6 +1515,7 @@ def main() -> None:
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=pipeline_health_summary,
         portfolio_risk_contribution=portfolio_risk_contribution,
+        macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1402,6 +1544,7 @@ def main() -> None:
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=pipeline_health_summary,
         portfolio_risk_contribution=portfolio_risk_contribution,
+        macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=report_notes,
     )
@@ -1433,6 +1576,7 @@ def main() -> None:
     final_table_paths = collect_table_output_paths(args.output_dir)
     final_table_paths["etf_metadata_summary"] = etf_metadata_summary_path
     final_table_paths["macro_observation_summary"] = macro_summary_path
+    final_table_paths["macro_regime_summary"] = macro_regime_summary_path
     final_table_paths["output_inventory"] = inventory_path
     final_table_paths["pipeline_health_summary"] = pipeline_health_summary_path
     final_table_paths["risk_limit_checks"] = risk_limit_path

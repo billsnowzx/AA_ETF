@@ -164,6 +164,26 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
             {"us10y_yield": [4.2], "vix": [15.0]},
             index=pd.Index(["2024-01-02"], name="date"),
         ).to_csv(table_dir / "macro_observation_summary.csv")
+        pd.DataFrame(
+            [
+                {
+                    "as_of_date": "2024-01-02",
+                    "metric": "vix",
+                    "latest_value": 15.0,
+                    "reference_value": 25.0,
+                    "signal": "risk_on",
+                    "rule": "risk_off when latest VIX >= 25",
+                },
+                {
+                    "as_of_date": "2024-01-02",
+                    "metric": "composite_regime",
+                    "latest_value": 1.0,
+                    "reference_value": 3.0,
+                    "signal": "mixed",
+                    "rule": "risk_off if >=2 component risk_off signals; risk_on if >=2 risk_on; else mixed",
+                },
+            ]
+        ).to_csv(table_dir / "macro_regime_summary.csv", index=False)
         (table_dir / "pipeline_manifest.json").write_text(
             json.dumps(
                 {
@@ -202,6 +222,8 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Output Inventory" in html
         assert "Pipeline Health" in html
         assert "Latest Macro Observations" in html
+        assert "Macro Regime Summary" in html
+        assert "composite_regime" in html
         assert "performance_summary" in html
         assert "liquidity_filtered" in html
         assert "risk_limits_has_breach" in html
@@ -265,6 +287,14 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
                     "run_passed_quality_gates": [True],
                 },
                 index=pd.Index(["health"]),
+            ),
+            "macro_regime_summary": pd.DataFrame(
+                {
+                    "metric": ["composite_regime"],
+                    "latest_value": [2.0],
+                    "reference_value": [4.0],
+                    "signal": ["risk_off"],
+                }
             ),
             "data_quality_summary": pd.DataFrame({"observations": [2], "missing_volume": [0]}),
             "trend_filter_summary": pd.DataFrame(
@@ -334,6 +364,8 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["run_configuration"].loc["config_risk_limits", "value"] == "config\\risk_limits.yaml"
     assert tables["output_inventory"].iloc[0]["size_bytes"] == "1234"
     assert tables["pipeline_health_summary"].loc["health", "risk_limit_breach_count"] == "1"
+    assert tables["macro_regime_summary"].iloc[0]["latest_value"] == "2.0000"
+    assert tables["macro_regime_summary"].iloc[0]["reference_value"] == "4.0000"
     assert tables["data_quality_summary"].iloc[0]["observations"] == "2"
     assert tables["trend_filter_summary"].iloc[0]["trend_active_ratio"] == "66.67%"
     assert tables["trend_filter_summary"].iloc[0]["max_reduced_assets"] == "1"

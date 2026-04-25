@@ -16,6 +16,7 @@ REQUIRED_TABLES = [
     "rebalance_reason.csv",
     "rebalance_reason_summary.csv",
     "macro_observation_summary.csv",
+    "macro_regime_summary.csv",
     "risk_limit_checks.csv",
     "risk_limit_breaches.csv",
     "risk_limit_breach_summary.csv",

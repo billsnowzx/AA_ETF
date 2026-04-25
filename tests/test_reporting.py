@@ -158,6 +158,29 @@ def _sample_portfolio_risk_contribution() -> pd.DataFrame:
     )
 
 
+def _sample_macro_regime_summary() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "as_of_date": "2024-12-31",
+                "metric": "vix",
+                "latest_value": 18.0,
+                "reference_value": 25.0,
+                "signal": "risk_on",
+                "rule": "risk_off when latest VIX >= 25",
+            },
+            {
+                "as_of_date": "2024-12-31",
+                "metric": "composite_regime",
+                "latest_value": 1.0,
+                "reference_value": 4.0,
+                "signal": "mixed",
+                "rule": "risk_off if >=2 component risk_off signals; risk_on if >=2 risk_on; else mixed",
+            },
+        ]
+    )
+
+
 def test_build_phase1_report_markdown_contains_key_sections() -> None:
     performance_summary = _sample_frame()
     turnover_summary = pd.DataFrame(
@@ -242,6 +265,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         risk_limit_breach_summary=_sample_risk_limit_breach_summary(),
         pipeline_health_summary=_sample_pipeline_health_summary(),
         portfolio_risk_contribution=_sample_portfolio_risk_contribution(),
+        macro_regime_summary=_sample_macro_regime_summary(),
         run_configuration=_sample_run_configuration(),
         notes=["IAGG failed the liquidity filter"],
     )
@@ -262,6 +286,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "## Risk Limit Breaches" in report
     assert "## Risk Limit Breach Summary" in report
     assert "## Pipeline Health Summary" in report
+    assert "## Macro Regime Summary" in report
     assert "## Portfolio Risk Contribution" in report
     assert "## Data Quality Summary" in report
     assert "## Run Configuration" in report
@@ -274,6 +299,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "calendar+drift" in report
     assert "run_passed_quality_gates" in report
     assert "percent_risk_contribution" in report
+    assert "composite_regime" in report
 
 
 def test_build_phase1_report_html_contains_key_sections() -> None:
@@ -358,6 +384,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
         risk_limit_breach_summary=_sample_risk_limit_breach_summary(),
         pipeline_health_summary=_sample_pipeline_health_summary(),
         portfolio_risk_contribution=_sample_portfolio_risk_contribution(),
+        macro_regime_summary=_sample_macro_regime_summary(),
         notes=["Backtest universe mode: liquidity_filtered"],
     )
 
@@ -374,6 +401,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "<h2>Risk Limit Breaches</h2>" in report
     assert "<h2>Risk Limit Breach Summary</h2>" in report
     assert "<h2>Pipeline Health Summary</h2>" in report
+    assert "<h2>Macro Regime Summary</h2>" in report
     assert "<h2>Portfolio Risk Contribution</h2>" in report
     assert "<h2>Data Quality Summary</h2>" in report
     assert "<h2>Run Configuration</h2>" in report
@@ -386,6 +414,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "calendar+drift" in report
     assert "run_passed_quality_gates" in report
     assert "percent_risk_contribution" in report
+    assert "composite_regime" in report
 
 
 def test_build_rebalance_reason_summary_counts_trigger_types() -> None:

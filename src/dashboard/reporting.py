@@ -317,6 +317,18 @@ def _format_portfolio_risk_contribution(portfolio_risk_contribution: pd.DataFram
     return formatted
 
 
+def _format_macro_regime_summary(macro_regime_summary: pd.DataFrame | None) -> pd.DataFrame:
+    """Format macro regime summary rows for report presentation."""
+    if macro_regime_summary is None or macro_regime_summary.empty:
+        return pd.DataFrame()
+
+    formatted = macro_regime_summary.astype(object).copy()
+    for column in ["latest_value", "reference_value"]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(_format_decimal)
+    return formatted
+
+
 def build_run_configuration_summary(
     *,
     start: str,
@@ -368,6 +380,7 @@ def build_phase1_report_markdown(
     risk_limit_breach_summary: pd.DataFrame | None = None,
     pipeline_health_summary: pd.DataFrame | None = None,
     portfolio_risk_contribution: pd.DataFrame | None = None,
+    macro_regime_summary: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
     """Build a concise Markdown report from Phase 1 pipeline outputs."""
@@ -448,6 +461,7 @@ def build_phase1_report_markdown(
     risk_limit_breach_summary_view = _format_risk_limit_breach_summary(risk_limit_breach_summary)
     pipeline_health_view = _format_pipeline_health_summary(pipeline_health_summary)
     portfolio_risk_contribution_view = _format_portfolio_risk_contribution(portfolio_risk_contribution)
+    macro_regime_view = _format_macro_regime_summary(macro_regime_summary)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
@@ -532,6 +546,10 @@ Generated: {report_date}
 
 {dataframe_to_markdown_table(pipeline_health_view) if not pipeline_health_view.empty else "No pipeline health summary generated."}
 
+## Macro Regime Summary
+
+{dataframe_to_markdown_table(macro_regime_view) if not macro_regime_view.empty else "No macro regime summary generated."}
+
 ## Portfolio Risk Contribution
 
 {dataframe_to_markdown_table(portfolio_risk_contribution_view) if not portfolio_risk_contribution_view.empty else "No portfolio risk contribution generated."}
@@ -584,6 +602,7 @@ def build_phase1_report_html(
     risk_limit_breach_summary: pd.DataFrame | None = None,
     pipeline_health_summary: pd.DataFrame | None = None,
     portfolio_risk_contribution: pd.DataFrame | None = None,
+    macro_regime_summary: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
     """Build a shareable HTML report from Phase 1 pipeline outputs."""
@@ -664,6 +683,7 @@ def build_phase1_report_html(
     risk_limit_breach_summary_view = _format_risk_limit_breach_summary(risk_limit_breach_summary)
     pipeline_health_view = _format_pipeline_health_summary(pipeline_health_summary)
     portfolio_risk_contribution_view = _format_portfolio_risk_contribution(portfolio_risk_contribution)
+    macro_regime_view = _format_macro_regime_summary(macro_regime_summary)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
@@ -726,6 +746,7 @@ def build_phase1_report_html(
   <section><h2>Risk Limit Breaches</h2>{dataframe_to_html_table(risk_limit_breach_view) if not risk_limit_breach_view.empty else "<p>No risk limit breaches generated.</p>"}</section>
   <section><h2>Risk Limit Breach Summary</h2>{dataframe_to_html_table(risk_limit_breach_summary_view) if not risk_limit_breach_summary_view.empty else "<p>No risk limit breach summary generated.</p>"}</section>
   <section><h2>Pipeline Health Summary</h2>{dataframe_to_html_table(pipeline_health_view) if not pipeline_health_view.empty else "<p>No pipeline health summary generated.</p>"}</section>
+  <section><h2>Macro Regime Summary</h2>{dataframe_to_html_table(macro_regime_view) if not macro_regime_view.empty else "<p>No macro regime summary generated.</p>"}</section>
   <section><h2>Portfolio Risk Contribution</h2>{dataframe_to_html_table(portfolio_risk_contribution_view) if not portfolio_risk_contribution_view.empty else "<p>No portfolio risk contribution generated.</p>"}</section>
   <section><h2>ETF Summary</h2>{dataframe_to_html_table(etf_view)}</section>
   <section><h2>Data Quality Summary</h2>{dataframe_to_html_table(data_quality_view) if not data_quality_view.empty else "<p>No data quality summary generated.</p>"}</section>
@@ -763,6 +784,7 @@ def write_phase1_report(
     risk_limit_breach_summary: pd.DataFrame | None = None,
     pipeline_health_summary: pd.DataFrame | None = None,
     portfolio_risk_contribution: pd.DataFrame | None = None,
+    macro_regime_summary: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
     """Write the Phase 1 Markdown report to disk."""
@@ -792,6 +814,7 @@ def write_phase1_report(
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=pipeline_health_summary,
         portfolio_risk_contribution=portfolio_risk_contribution,
+        macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=notes,
     )
@@ -825,6 +848,7 @@ def write_phase1_html_report(
     risk_limit_breach_summary: pd.DataFrame | None = None,
     pipeline_health_summary: pd.DataFrame | None = None,
     portfolio_risk_contribution: pd.DataFrame | None = None,
+    macro_regime_summary: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
     """Write the Phase 1 HTML report to disk."""
@@ -854,6 +878,7 @@ def write_phase1_html_report(
         risk_limit_breach_summary=risk_limit_breach_summary,
         pipeline_health_summary=pipeline_health_summary,
         portfolio_risk_contribution=portfolio_risk_contribution,
+        macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=notes,
     )

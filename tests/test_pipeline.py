@@ -7,10 +7,12 @@ import pandas as pd
 
 from run_pipeline import (
     build_argument_parser,
+    build_macro_regime_summary,
     main,
     save_processed_frames,
     write_data_quality_outputs,
     write_liquidity_outputs,
+    write_macro_regime_summary_output,
     write_macro_outputs,
 )
 
@@ -84,6 +86,34 @@ def test_write_macro_outputs_writes_summary_file() -> None:
         loaded = pd.read_csv(path, index_col=0)
         assert "us10y_yield" in loaded.columns
         assert "vix" in loaded.columns
+    finally:
+        shutil.rmtree(output_dir, ignore_errors=True)
+
+
+def test_build_macro_regime_summary_and_write_output() -> None:
+    output_dir = Path("data/cache") / f"test_macro_regime_{uuid.uuid4().hex}"
+    index = pd.date_range("2024-01-01", periods=5, freq="B")
+    macro = pd.DataFrame(
+        {
+            "vix": [20.0, 21.0, 22.0, 23.0, 26.0],
+            "us_2s10s_slope": [0.3, 0.2, 0.1, -0.1, -0.2],
+            "hyg_lqd_ratio": [1.01, 1.00, 0.99, 0.98, 0.97],
+            "usd_index": [103.0, 103.5, 104.0, 104.5, 105.0],
+        },
+        index=index,
+    )
+    macro.index.name = "date"
+
+    try:
+        summary = build_macro_regime_summary(macro, lookback_days=3)
+        path = write_macro_regime_summary_output(summary, output_dir)
+        loaded = pd.read_csv(path)
+
+        assert path.exists()
+        assert "composite_regime" in loaded["metric"].values
+        composite = loaded.loc[loaded["metric"] == "composite_regime"].iloc[0]
+        assert composite["signal"] == "risk_off"
+        assert int(float(composite["latest_value"])) >= 2
     finally:
         shutil.rmtree(output_dir, ignore_errors=True)
 
