@@ -1111,7 +1111,11 @@ def main() -> None:
     macro_summary_path = write_macro_outputs(macro_series, args.output_dir)
 
     liquid_tickers, liquidity_table = filter_liquid_universe(clean_frames)
-    etf_summary = score_etf_universe(args.universe_config, liquidity_table)
+    etf_summary = score_etf_universe(
+        args.universe_config,
+        liquidity_table,
+        metadata_summary=etf_metadata_summary,
+    )
     write_liquidity_outputs(liquid_tickers, liquidity_table, etf_summary, args.output_dir)
 
     required_backtest_tickers = collect_required_backtest_tickers(

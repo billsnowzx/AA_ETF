@@ -14,6 +14,7 @@ Phase 1 includes:
 - Drawdown and basic risk-adjusted analytics
 - Covariance and correlation analytics
 - Portfolio risk contribution and marginal contribution to risk analytics
+- ETF metadata-aware scoring inputs (metadata availability, expense ratio, total assets)
 - Benchmark-relative attribution and annual return tables
 - Portfolio template loading and weight normalization
 - Static-weight portfolio return and transaction-cost helpers

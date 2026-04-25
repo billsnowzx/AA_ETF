@@ -7,6 +7,7 @@ from src.universe.etf_scoring import (
     score_data_quality_component,
     score_etf_universe,
     score_liquidity_component,
+    score_strategy_fit_with_metadata,
     score_strategy_fit_component,
 )
 
@@ -32,6 +33,31 @@ def test_score_strategy_fit_component_requires_metadata() -> None:
     assert math.isclose(score, 5.0, rel_tol=1e-9)
 
 
+def test_score_strategy_fit_with_metadata_penalizes_missing_metadata() -> None:
+    score = score_strategy_fit_with_metadata(
+        asset_class="us_equity",
+        description="US total market equity",
+        metadata_available=False,
+        expense_ratio=None,
+        total_assets=None,
+    )
+
+    assert score < 5.0
+    assert math.isclose(score, 2.5, rel_tol=1e-9)
+
+
+def test_score_strategy_fit_with_metadata_rewards_low_expense_and_large_assets() -> None:
+    score = score_strategy_fit_with_metadata(
+        asset_class="us_equity",
+        description="US total market equity",
+        metadata_available=True,
+        expense_ratio=0.0003,
+        total_assets=5_000_000_000,
+    )
+
+    assert math.isclose(score, 5.0, rel_tol=1e-9)
+
+
 def test_score_etf_universe_builds_ranked_summary() -> None:
     liquidity_summary = pd.DataFrame(
         {
@@ -52,3 +78,30 @@ def test_score_etf_universe_builds_ranked_summary() -> None:
     assert math.isclose(scored.loc["VTI", "phase1_score_pct"], 1.0, rel_tol=1e-9)
     assert scored.loc["VNQ", "phase1_total_score"] < PHASE1_MAX_SCORE
     assert scored.loc["VTI", "phase1_rank"] == 1
+
+
+def test_score_etf_universe_uses_metadata_summary_when_provided() -> None:
+    liquidity_summary = pd.DataFrame(
+        {
+            "observations": [300, 300],
+            "average_dollar_volume": [80_000_000.0, 80_000_000.0],
+            "recent_pass_ratio": [1.0, 1.0],
+            "has_sufficient_history": [True, True],
+            "passes_average_volume_threshold": [True, True],
+            "passes_recent_liquidity_threshold": [True, True],
+            "passes_liquidity_filter": [True, True],
+        },
+        index=pd.Index(["VTI", "VNQ"], name="ticker"),
+    )
+    metadata_summary = pd.DataFrame(
+        {
+            "metadata_available": [True, False],
+            "expense_ratio": [0.0003, None],
+            "total_assets": [1_000_000_000, None],
+        },
+        index=pd.Index(["VTI", "VNQ"], name="ticker"),
+    )
+
+    scored = score_etf_universe("config/etf_universe.yaml", liquidity_summary, metadata_summary=metadata_summary)
+
+    assert scored.loc["VTI", "strategy_fit_score"] > scored.loc["VNQ", "strategy_fit_score"]
