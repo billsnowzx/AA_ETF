@@ -20,6 +20,7 @@ from src.analytics.correlation import (
     rolling_correlation,
 )
 from src.analytics.drawdown import drawdown_from_returns
+from src.analytics.evaluation import build_portfolio_evaluation_summary
 from src.analytics.risk import risk_contribution_table, rolling_sharpe_ratio, rolling_volatility
 from src.backtest.engine import run_fixed_weight_backtest
 from src.data.clean_data import batch_clean_price_frames, build_data_quality_summary
@@ -715,6 +716,26 @@ def write_portfolio_score_summary(
     path = output_path / "portfolio_score_summary.csv"
     portfolio_scores.to_csv(path, index=True)
     LOGGER.info("Saved portfolio score summary to %s", path)
+    return path
+
+
+def write_portfolio_evaluation_summary(
+    return_table: pd.DataFrame,
+    nav_table: pd.DataFrame,
+    rolling_sharpe_table: pd.DataFrame,
+    output_dir: str | Path,
+) -> Path:
+    """Persist portfolio evaluation summary as an auditable CSV."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    portfolio_evaluation = build_portfolio_evaluation_summary(
+        return_table=return_table,
+        nav_table=nav_table,
+        rolling_sharpe_table=rolling_sharpe_table,
+    )
+    path = output_path / "portfolio_evaluation_summary.csv"
+    portfolio_evaluation.to_csv(path, index=True)
+    LOGGER.info("Saved portfolio evaluation summary to %s", path)
     return path
 
 
@@ -1541,9 +1562,10 @@ def main() -> None:
         strategy_result,
         risk_outputs["covariance_matrix"],
     )
+    nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
     chart_paths = write_phase1_chart_outputs(
         strategy_name,
-        build_nav_table(strategy_name, strategy_result, benchmark_results),
+        nav_table,
         strategy_result["annual_return_table"],
         asset_returns,
         args.figure_dir,
@@ -1564,6 +1586,13 @@ def main() -> None:
         output_dir=args.output_dir,
     )
     portfolio_score_summary = pd.read_csv(portfolio_score_summary_path, index_col=0)
+    portfolio_evaluation_summary_path = write_portfolio_evaluation_summary(
+        return_table=return_table,
+        nav_table=nav_table,
+        rolling_sharpe_table=rolling_outputs["rolling_sharpe"],
+        output_dir=args.output_dir,
+    )
+    portfolio_evaluation_summary = pd.read_csv(portfolio_evaluation_summary_path, index_col=0)
     trend_filter_summary = build_trend_filter_summary(strategy_name, strategy_result)
     risk_switch_summary = build_risk_switch_summary(strategy_name, strategy_result)
     rebalance_reason_table = build_rebalance_reason_table(strategy_name, strategy_result, benchmark_results)
@@ -1662,6 +1691,7 @@ def main() -> None:
         pipeline_health_summary=None,
         portfolio_risk_contribution=portfolio_risk_contribution,
         portfolio_score_summary=portfolio_score_summary,
+        portfolio_evaluation_summary=portfolio_evaluation_summary,
         macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=report_notes,
@@ -1694,6 +1724,7 @@ def main() -> None:
         pipeline_health_summary=None,
         portfolio_risk_contribution=portfolio_risk_contribution,
         portfolio_score_summary=portfolio_score_summary,
+        portfolio_evaluation_summary=portfolio_evaluation_summary,
         macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=report_notes,
@@ -1780,6 +1811,7 @@ def main() -> None:
         pipeline_health_summary=pipeline_health_summary,
         portfolio_risk_contribution=portfolio_risk_contribution,
         portfolio_score_summary=portfolio_score_summary,
+        portfolio_evaluation_summary=portfolio_evaluation_summary,
         macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=report_notes,
@@ -1812,6 +1844,7 @@ def main() -> None:
         pipeline_health_summary=pipeline_health_summary,
         portfolio_risk_contribution=portfolio_risk_contribution,
         portfolio_score_summary=portfolio_score_summary,
+        portfolio_evaluation_summary=portfolio_evaluation_summary,
         macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=report_notes,
@@ -1851,6 +1884,7 @@ def main() -> None:
     final_table_paths["risk_limit_breaches"] = risk_limit_breaches_path
     final_table_paths["risk_limit_breach_summary"] = risk_limit_breach_summary_path
     final_table_paths["portfolio_score_summary"] = portfolio_score_summary_path
+    final_table_paths["portfolio_evaluation_summary"] = portfolio_evaluation_summary_path
     manifest = build_pipeline_manifest(
         start=args.start,
         end=args.end,

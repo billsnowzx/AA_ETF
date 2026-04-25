@@ -350,6 +350,23 @@ def _format_portfolio_score_summary(portfolio_score_summary: pd.DataFrame | None
     return formatted
 
 
+def _format_portfolio_evaluation_summary(portfolio_evaluation_summary: pd.DataFrame | None) -> pd.DataFrame:
+    """Format portfolio evaluation summary for report presentation."""
+    if portfolio_evaluation_summary is None or portfolio_evaluation_summary.empty:
+        return pd.DataFrame()
+    formatted = portfolio_evaluation_summary.astype(object).copy()
+    for column in ["monthly_win_rate", "annual_win_rate"]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(_format_percent)
+    if "max_drawdown_recovery_days" in formatted.columns:
+        formatted["max_drawdown_recovery_days"] = formatted["max_drawdown_recovery_days"].map(
+            lambda value: _format_decimal(value, digits=0)
+        )
+    if "rolling_sharpe_stability" in formatted.columns:
+        formatted["rolling_sharpe_stability"] = formatted["rolling_sharpe_stability"].map(_format_decimal)
+    return formatted
+
+
 def _format_macro_regime_summary(macro_regime_summary: pd.DataFrame | None) -> pd.DataFrame:
     """Format macro regime summary rows for report presentation."""
     if macro_regime_summary is None or macro_regime_summary.empty:
@@ -432,6 +449,7 @@ def build_phase1_report_markdown(
     pipeline_health_summary: pd.DataFrame | None = None,
     portfolio_risk_contribution: pd.DataFrame | None = None,
     portfolio_score_summary: pd.DataFrame | None = None,
+    portfolio_evaluation_summary: pd.DataFrame | None = None,
     macro_regime_summary: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
@@ -515,6 +533,7 @@ def build_phase1_report_markdown(
     pipeline_health_view = _format_pipeline_health_summary(pipeline_health_summary)
     portfolio_risk_contribution_view = _format_portfolio_risk_contribution(portfolio_risk_contribution)
     portfolio_score_view = _format_portfolio_score_summary(portfolio_score_summary)
+    portfolio_evaluation_view = _format_portfolio_evaluation_summary(portfolio_evaluation_summary)
     macro_regime_view = _format_macro_regime_summary(macro_regime_summary)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     risk_switch_view = _format_risk_switch_summary(risk_switch_summary)
@@ -621,6 +640,10 @@ Generated: {report_date}
 
 {dataframe_to_markdown_table(portfolio_score_view) if not portfolio_score_view.empty else "No portfolio score summary generated."}
 
+## Portfolio Evaluation Summary
+
+{dataframe_to_markdown_table(portfolio_evaluation_view) if not portfolio_evaluation_view.empty else "No portfolio evaluation summary generated."}
+
 ## ETF Summary
 
 {dataframe_to_markdown_table(etf_view)}
@@ -672,6 +695,7 @@ def build_phase1_report_html(
     pipeline_health_summary: pd.DataFrame | None = None,
     portfolio_risk_contribution: pd.DataFrame | None = None,
     portfolio_score_summary: pd.DataFrame | None = None,
+    portfolio_evaluation_summary: pd.DataFrame | None = None,
     macro_regime_summary: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
@@ -755,6 +779,7 @@ def build_phase1_report_html(
     pipeline_health_view = _format_pipeline_health_summary(pipeline_health_summary)
     portfolio_risk_contribution_view = _format_portfolio_risk_contribution(portfolio_risk_contribution)
     portfolio_score_view = _format_portfolio_score_summary(portfolio_score_summary)
+    portfolio_evaluation_view = _format_portfolio_evaluation_summary(portfolio_evaluation_summary)
     macro_regime_view = _format_macro_regime_summary(macro_regime_summary)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     risk_switch_view = _format_risk_switch_summary(risk_switch_summary)
@@ -824,6 +849,7 @@ def build_phase1_report_html(
   <section><h2>Macro Regime Summary</h2>{dataframe_to_html_table(macro_regime_view) if not macro_regime_view.empty else "<p>No macro regime summary generated.</p>"}</section>
   <section><h2>Portfolio Risk Contribution</h2>{dataframe_to_html_table(portfolio_risk_contribution_view) if not portfolio_risk_contribution_view.empty else "<p>No portfolio risk contribution generated.</p>"}</section>
   <section><h2>Portfolio Score Summary</h2>{dataframe_to_html_table(portfolio_score_view) if not portfolio_score_view.empty else "<p>No portfolio score summary generated.</p>"}</section>
+  <section><h2>Portfolio Evaluation Summary</h2>{dataframe_to_html_table(portfolio_evaluation_view) if not portfolio_evaluation_view.empty else "<p>No portfolio evaluation summary generated.</p>"}</section>
   <section><h2>ETF Summary</h2>{dataframe_to_html_table(etf_view)}</section>
   <section><h2>Data Quality Summary</h2>{dataframe_to_html_table(data_quality_view) if not data_quality_view.empty else "<p>No data quality summary generated.</p>"}</section>
   <section><h2>Correlation Highlights</h2>{dataframe_to_html_table(correlation_summary) if not correlation_summary.empty else "<p>No non-diagonal correlation pairs available.</p>"}</section>
@@ -863,6 +889,7 @@ def write_phase1_report(
     pipeline_health_summary: pd.DataFrame | None = None,
     portfolio_risk_contribution: pd.DataFrame | None = None,
     portfolio_score_summary: pd.DataFrame | None = None,
+    portfolio_evaluation_summary: pd.DataFrame | None = None,
     macro_regime_summary: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
@@ -896,6 +923,7 @@ def write_phase1_report(
         pipeline_health_summary=pipeline_health_summary,
         portfolio_risk_contribution=portfolio_risk_contribution,
         portfolio_score_summary=portfolio_score_summary,
+        portfolio_evaluation_summary=portfolio_evaluation_summary,
         macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=notes,
@@ -933,6 +961,7 @@ def write_phase1_html_report(
     pipeline_health_summary: pd.DataFrame | None = None,
     portfolio_risk_contribution: pd.DataFrame | None = None,
     portfolio_score_summary: pd.DataFrame | None = None,
+    portfolio_evaluation_summary: pd.DataFrame | None = None,
     macro_regime_summary: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
@@ -966,6 +995,7 @@ def write_phase1_html_report(
         pipeline_health_summary=pipeline_health_summary,
         portfolio_risk_contribution=portfolio_risk_contribution,
         portfolio_score_summary=portfolio_score_summary,
+        portfolio_evaluation_summary=portfolio_evaluation_summary,
         macro_regime_summary=macro_regime_summary,
         run_configuration=run_configuration,
         notes=notes,

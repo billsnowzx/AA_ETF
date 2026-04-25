@@ -163,6 +163,16 @@ def _format_dashboard_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.Da
         if "rank" in frame.columns:
             frame["rank"] = frame["rank"].map(_format_integer)
 
+    if "portfolio_evaluation_summary" in formatted:
+        frame = formatted["portfolio_evaluation_summary"]
+        for column in ["monthly_win_rate", "annual_win_rate"]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_percent)
+        if "max_drawdown_recovery_days" in frame.columns:
+            frame["max_drawdown_recovery_days"] = frame["max_drawdown_recovery_days"].map(_format_integer)
+        if "rolling_sharpe_stability" in frame.columns:
+            frame["rolling_sharpe_stability"] = frame["rolling_sharpe_stability"].map(_format_decimal)
+
     if "etf_summary" in formatted:
         frame = formatted["etf_summary"]
         for column in ["average_dollar_volume", "latest_rolling_average_dollar_volume"]:
@@ -313,6 +323,7 @@ def build_dashboard_html(
     asset_risk_snapshot = _read_csv_if_exists(output_path / "asset_risk_snapshot.csv")
     portfolio_risk_contribution = _read_csv_if_exists(output_path / "portfolio_risk_contribution.csv")
     portfolio_score_summary = _read_csv_if_exists(output_path / "portfolio_score_summary.csv")
+    portfolio_evaluation_summary = _read_csv_if_exists(output_path / "portfolio_evaluation_summary.csv")
     etf_summary = _read_csv_if_exists(output_path / "etf_summary.csv")
     etf_metadata_summary = _read_csv_if_exists(output_path / "etf_metadata_summary.csv")
     data_quality_summary = _read_csv_if_exists(output_path / "data_quality_summary.csv")
@@ -342,6 +353,7 @@ def build_dashboard_html(
             "asset_risk_snapshot": asset_risk_snapshot,
             "portfolio_risk_contribution": portfolio_risk_contribution,
             "portfolio_score_summary": portfolio_score_summary,
+            "portfolio_evaluation_summary": portfolio_evaluation_summary,
             "etf_summary": etf_summary,
             "etf_metadata_summary": etf_metadata_summary,
             "data_quality_summary": data_quality_summary,
@@ -371,6 +383,7 @@ def build_dashboard_html(
     asset_risk_snapshot = formatted_tables["asset_risk_snapshot"]
     portfolio_risk_contribution = formatted_tables["portfolio_risk_contribution"]
     portfolio_score_summary = formatted_tables["portfolio_score_summary"]
+    portfolio_evaluation_summary = formatted_tables["portfolio_evaluation_summary"]
     etf_summary = formatted_tables["etf_summary"]
     etf_metadata_summary = formatted_tables["etf_metadata_summary"]
     data_quality_summary = formatted_tables["data_quality_summary"]
@@ -563,6 +576,10 @@ def build_dashboard_html(
       <section class="card">
         <h2>Portfolio Score Summary</h2>
         {dataframe_to_html_table(portfolio_score_summary)}
+      </section>
+      <section class="card">
+        <h2>Portfolio Evaluation Summary</h2>
+        {dataframe_to_html_table(portfolio_evaluation_summary)}
       </section>
       <section class="card">
         <h2>ETF Summary</h2>

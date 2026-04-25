@@ -72,6 +72,15 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
             },
             index=pd.Index(["balanced"], name="portfolio"),
         ).to_csv(table_dir / "portfolio_score_summary.csv")
+        pd.DataFrame(
+            {
+                "monthly_win_rate": [0.70],
+                "annual_win_rate": [0.80],
+                "max_drawdown_recovery_days": [30],
+                "rolling_sharpe_stability": [0.8500],
+            },
+            index=pd.Index(["balanced"], name="portfolio"),
+        ).to_csv(table_dir / "portfolio_evaluation_summary.csv")
         pd.DataFrame({"balanced": [0.10]}, index=pd.Index(["2024-01-01"], name="date")).to_csv(
             table_dir / "rolling_volatility.csv"
         )
@@ -270,6 +279,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Risk Limit Breach Summary" in html
         assert "Portfolio Risk Contribution" in html
         assert "Portfolio Score Summary" in html
+        assert "Portfolio Evaluation Summary" in html
         assert "balanced_risk_contribution.png" in html
         assert "balanced_mctr.png" in html
         assert "66.67%" in html
@@ -313,6 +323,15 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
                     "total_score": [75.0],
                     "score_pct": [0.75],
                     "rank": [1],
+                },
+                index=pd.Index(["balanced"]),
+            ),
+            "portfolio_evaluation_summary": pd.DataFrame(
+                {
+                    "monthly_win_rate": [0.70],
+                    "annual_win_rate": [0.80],
+                    "max_drawdown_recovery_days": [30],
+                    "rolling_sharpe_stability": [0.8500],
                 },
                 index=pd.Index(["balanced"]),
             ),
@@ -412,6 +431,9 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["portfolio_risk_contribution"].loc["VTI", "marginal_contribution_to_risk"] == "0.1200"
     assert tables["portfolio_score_summary"].loc["balanced", "total_score"] == "75.0000"
     assert tables["portfolio_score_summary"].loc["balanced", "score_pct"] == "75.00%"
+    assert tables["portfolio_evaluation_summary"].loc["balanced", "monthly_win_rate"] == "70.00%"
+    assert tables["portfolio_evaluation_summary"].loc["balanced", "max_drawdown_recovery_days"] == "30"
+    assert tables["portfolio_evaluation_summary"].loc["balanced", "rolling_sharpe_stability"] == "0.8500"
     assert tables["rolling_volatility"].iloc[0]["balanced"] == "10.00%"
     assert tables["rolling_sharpe"].iloc[0]["balanced"] == "0.5000"
     assert tables["rolling_correlation"].iloc[0]["VTI_AGG_rolling_correlation"] == "0.2500"
