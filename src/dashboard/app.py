@@ -176,6 +176,16 @@ def _format_dashboard_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.Da
         if "avg_reduced_assets" in frame.columns:
             frame["avg_reduced_assets"] = frame["avg_reduced_assets"].map(_format_decimal)
 
+    if "risk_switch_summary" in formatted:
+        frame = formatted["risk_switch_summary"]
+        for column in ["observations", "risk_switch_active_days", "max_reduced_assets"]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_integer)
+        if "risk_switch_active_ratio" in frame.columns:
+            frame["risk_switch_active_ratio"] = frame["risk_switch_active_ratio"].map(_format_percent)
+        if "avg_reduced_assets" in frame.columns:
+            frame["avg_reduced_assets"] = frame["avg_reduced_assets"].map(_format_decimal)
+
     if "risk_limit_checks" in formatted:
         frame = formatted["risk_limit_checks"]
         for column in ["threshold", "observed", "comparison_value"]:
@@ -288,6 +298,7 @@ def build_dashboard_html(
     etf_metadata_summary = _read_csv_if_exists(output_path / "etf_metadata_summary.csv")
     data_quality_summary = _read_csv_if_exists(output_path / "data_quality_summary.csv")
     trend_filter_summary = _read_csv_if_exists(output_path / "trend_filter_summary.csv")
+    risk_switch_summary = _read_csv_if_exists(output_path / "risk_switch_summary.csv")
     risk_limit_checks = _read_csv_if_exists(output_path / "risk_limit_checks.csv")
     risk_limit_breaches = _read_csv_if_exists(output_path / "risk_limit_breaches.csv")
     risk_limit_breach_summary = _read_csv_if_exists(output_path / "risk_limit_breach_summary.csv")
@@ -315,6 +326,7 @@ def build_dashboard_html(
             "etf_metadata_summary": etf_metadata_summary,
             "data_quality_summary": data_quality_summary,
             "trend_filter_summary": trend_filter_summary,
+            "risk_switch_summary": risk_switch_summary,
             "risk_limit_checks": risk_limit_checks,
             "risk_limit_breaches": risk_limit_breaches,
             "risk_limit_breach_summary": risk_limit_breach_summary,
@@ -342,6 +354,7 @@ def build_dashboard_html(
     etf_metadata_summary = formatted_tables["etf_metadata_summary"]
     data_quality_summary = formatted_tables["data_quality_summary"]
     trend_filter_summary = formatted_tables["trend_filter_summary"]
+    risk_switch_summary = formatted_tables["risk_switch_summary"]
     risk_limit_checks = formatted_tables["risk_limit_checks"]
     risk_limit_breaches = formatted_tables["risk_limit_breaches"]
     risk_limit_breach_summary = formatted_tables["risk_limit_breach_summary"]
@@ -541,6 +554,10 @@ def build_dashboard_html(
       <section class="card">
         <h2>Trend Filter Summary</h2>
         {dataframe_to_html_table(trend_filter_summary)}
+      </section>
+      <section class="card">
+        <h2>Risk Switch Summary</h2>
+        {dataframe_to_html_table(risk_switch_summary)}
       </section>
       <section class="card">
         <h2>Risk Limit Checks</h2>

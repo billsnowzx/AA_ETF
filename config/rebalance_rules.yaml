@@ -20,7 +20,8 @@ risk_switch:
   enabled: false
   lookback_days: 20
   annualized_volatility_threshold: null
+  reduction_fraction: 0.50
   destination_assets:
     - AGG
     - GLD
-  note: Placeholder only in Phase 1. No execution logic is implemented yet.
+  note: Optional volatility-triggered defensive overlay. Only active when enabled and threshold is configured.

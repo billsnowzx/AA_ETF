@@ -71,6 +71,54 @@ def build_trend_scale_table(
     return trend_scale_table
 
 
+def apply_risk_switch_to_target_weights(
+    target_weights: pd.Series,
+    risk_assets: list[str],
+    destination_assets: list[str],
+    reduction_fraction: float,
+) -> pd.Series:
+    """Reduce risky assets and transfer freed weight to destination assets."""
+    adjusted = target_weights.copy()
+    if not risk_assets or not destination_assets or reduction_fraction <= 0.0:
+        return adjusted
+
+    active_risk_assets = [asset for asset in risk_assets if asset in adjusted.index]
+    active_destination_assets = [asset for asset in destination_assets if asset in adjusted.index]
+    if not active_risk_assets or not active_destination_assets:
+        return adjusted
+
+    original_risk_weights = adjusted.loc[active_risk_assets].copy()
+    reduced_risk_weights = original_risk_weights * (1.0 - reduction_fraction)
+    freed_weight = float((original_risk_weights - reduced_risk_weights).sum())
+    adjusted.loc[active_risk_assets] = reduced_risk_weights
+
+    destination_weights = adjusted.loc[active_destination_assets].copy()
+    destination_total = float(destination_weights.sum())
+    if destination_total > 0:
+        adjusted.loc[active_destination_assets] = destination_weights + (destination_weights / destination_total) * freed_weight
+    else:
+        adjusted.loc[active_destination_assets] = destination_weights + freed_weight / float(len(active_destination_assets))
+
+    total_weight = float(adjusted.sum())
+    if total_weight > 0:
+        adjusted = adjusted / total_weight
+    return adjusted
+
+
+def trailing_annualized_volatility(
+    returns: pd.Series,
+    lookback_days: int,
+    periods_per_year: int = 252,
+) -> float | None:
+    """Compute trailing annualized volatility using only historical returns."""
+    clean = pd.to_numeric(returns, errors="coerce").dropna()
+    if len(clean) < lookback_days:
+        return None
+    window = clean.tail(lookback_days)
+    volatility = float(window.std(ddof=1)) * (float(periods_per_year) ** 0.5)
+    return volatility
+
+
 def resolve_rebalance_period_alias(frequency: str) -> str:
     """Resolve a user-facing rebalance frequency to a pandas period alias."""
     normalized = frequency.lower()
@@ -168,6 +216,7 @@ def run_fixed_weight_backtest(
     rebalance_trigger_mode: str = "calendar",
     drift_threshold: float = 0.20,
     drift_rule_enabled: bool = True,
+    risk_switch: Mapping[str, object] | None = None,
 ) -> dict[str, pd.Series | pd.DataFrame]:
     """Run a simple fixed-weight portfolio backtest with explicit turnover and costs."""
     if asset_returns.empty:
@@ -204,6 +253,32 @@ def run_fixed_weight_backtest(
         )
         trend_active_flags = trend_scale_table.lt(1.0).any(axis=1).rename("trend_filter_active")
 
+    risk_switch_scales = pd.DataFrame(1.0, index=asset_returns.index, columns=asset_returns.columns, dtype=float)
+    risk_switch_active_flags = pd.Series(False, index=asset_returns.index, name="risk_switch_active")
+    risk_switch_enabled = False
+    risk_switch_lookback_days = 20
+    risk_switch_vol_threshold = None
+    risk_switch_reduction_fraction = 0.50
+    risk_switch_risk_assets: list[str] = []
+    risk_switch_destination_assets: list[str] = []
+    previous_risk_switch_active = False
+
+    if risk_switch and bool(risk_switch.get("enabled", False)):
+        risk_switch_enabled = True
+        risk_switch_lookback_days = int(risk_switch.get("lookback_days", 20))
+        risk_switch_vol_threshold = float(risk_switch.get("annualized_volatility_threshold", 0.0))
+        risk_switch_reduction_fraction = float(risk_switch.get("reduction_fraction", 0.50))
+        risk_switch_risk_assets = [str(asset) for asset in risk_switch.get("risk_assets", []) if str(asset) in asset_returns.columns]
+        risk_switch_destination_assets = [
+            str(asset) for asset in risk_switch.get("destination_assets", []) if str(asset) in asset_returns.columns
+        ]
+        if risk_switch_lookback_days < 2:
+            raise ValueError("Risk switch lookback_days must be >= 2.")
+        if risk_switch_vol_threshold <= 0.0:
+            raise ValueError("Risk switch annualized_volatility_threshold must be > 0.")
+        if risk_switch_reduction_fraction < 0.0 or risk_switch_reduction_fraction > 1.0:
+            raise ValueError("Risk switch reduction_fraction must be between 0 and 1.")
+
     current_weights = pd.Series(0.0, index=asset_returns.columns, dtype=float)
     nav = float(initial_nav)
 
@@ -224,6 +299,30 @@ def run_fixed_weight_backtest(
             aligned_target,
             trend_scale_table.loc[date],
         )
+        risk_switch_active = False
+        if risk_switch_enabled:
+            historical_returns = pd.Series(net_returns, index=asset_returns.index[: len(net_returns)])
+            trailing_volatility = trailing_annualized_volatility(
+                historical_returns,
+                lookback_days=risk_switch_lookback_days,
+                periods_per_year=periods_per_year,
+            )
+            risk_switch_active = (
+                trailing_volatility is not None
+                and trailing_volatility > float(risk_switch_vol_threshold)
+            )
+            risk_switch_active_flags.loc[date] = bool(risk_switch_active)
+            if risk_switch_active:
+                desired_target = apply_risk_switch_to_target_weights(
+                    target_weights=desired_target,
+                    risk_assets=risk_switch_risk_assets,
+                    destination_assets=risk_switch_destination_assets,
+                    reduction_fraction=risk_switch_reduction_fraction,
+                )
+                for asset in risk_switch_risk_assets:
+                    if asset in risk_switch_scales.columns:
+                        risk_switch_scales.loc[date, asset] = 1.0 - risk_switch_reduction_fraction
+
         drift_flag = False
         if drift_rule_enabled:
             drift_flag = should_rebalance_by_drift(
@@ -235,22 +334,24 @@ def run_fixed_weight_backtest(
         if date == first_date:
             rebalance_flag = True
             rebalance_reason = "initial"
-        elif trigger_mode == "calendar":
-            rebalance_flag = calendar_flag
-            rebalance_reason = "calendar" if rebalance_flag else "none"
-        elif trigger_mode == "drift_only":
-            rebalance_flag = drift_flag
-            rebalance_reason = "drift" if rebalance_flag else "none"
         else:
-            rebalance_flag = calendar_flag or drift_flag
-            if rebalance_flag and calendar_flag and drift_flag:
-                rebalance_reason = "calendar_and_drift"
-            elif rebalance_flag and calendar_flag:
-                rebalance_reason = "calendar"
-            elif rebalance_flag and drift_flag:
-                rebalance_reason = "drift"
+            risk_switch_flag = bool(risk_switch_enabled and (risk_switch_active != previous_risk_switch_active))
+            if trigger_mode == "calendar":
+                base_rebalance_flag = calendar_flag
+            elif trigger_mode == "drift_only":
+                base_rebalance_flag = drift_flag
             else:
-                rebalance_reason = "none"
+                base_rebalance_flag = calendar_flag or drift_flag
+
+            rebalance_flag = base_rebalance_flag or risk_switch_flag
+            reason_parts: list[str] = []
+            if calendar_flag and trigger_mode in {"calendar", "calendar_or_drift"}:
+                reason_parts.append("calendar")
+            if drift_flag and trigger_mode in {"drift_only", "calendar_or_drift"}:
+                reason_parts.append("drift")
+            if risk_switch_flag:
+                reason_parts.append("risk_switch")
+            rebalance_reason = "_and_".join(reason_parts) if reason_parts else "none"
         weights_before_return = current_weights.copy()
 
         if rebalance_flag:
@@ -286,6 +387,7 @@ def run_fixed_weight_backtest(
             current_weights = pd.Series(0.0, index=asset_returns.columns, dtype=float)
 
         end_weights_history.append(current_weights.copy())
+        previous_risk_switch_active = bool(risk_switch_active)
 
     portfolio_returns = pd.Series(net_returns, index=asset_returns.index, name="portfolio_return")
     gross_return_series = pd.Series(gross_returns, index=asset_returns.index, name="portfolio_return_gross")
@@ -313,6 +415,8 @@ def run_fixed_weight_backtest(
         "rebalance_reasons": rebalance_reason_series,
         "trend_filter_scales": trend_scale_table,
         "trend_filter_active": trend_active_flags,
+        "risk_switch_scales": risk_switch_scales,
+        "risk_switch_active": risk_switch_active_flags,
         "summary": risk_summary(portfolio_returns, periods_per_year=periods_per_year),
         "annual_return_table": compile_annual_return_table(
             portfolio_returns,

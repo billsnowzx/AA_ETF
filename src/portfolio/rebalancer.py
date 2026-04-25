@@ -79,6 +79,41 @@ def load_trend_filter_settings(config_path: str | Path) -> dict[str, bool | int 
     }
 
 
+def load_risk_switch_settings(config_path: str | Path) -> dict[str, bool | int | float | list[str] | None]:
+    """Load and validate risk-switch settings from rebalance config."""
+    config = load_rebalance_rules(config_path)
+    risk_switch = config.get("risk_switch", {})
+
+    enabled = bool(risk_switch.get("enabled", False))
+    lookback_days = int(risk_switch.get("lookback_days", 20))
+    annualized_volatility_threshold = risk_switch.get("annualized_volatility_threshold", None)
+    reduction_fraction = float(risk_switch.get("reduction_fraction", 0.50))
+    destination_assets = [str(asset) for asset in risk_switch.get("destination_assets", [])]
+
+    if lookback_days < 2:
+        raise ValueError("risk_switch.lookback_days must be >= 2.")
+    if reduction_fraction < 0.0 or reduction_fraction > 1.0:
+        raise ValueError("risk_switch.reduction_fraction must be between 0 and 1.")
+    if enabled:
+        if annualized_volatility_threshold is None:
+            raise ValueError(
+                "risk_switch.annualized_volatility_threshold must be configured when risk_switch.enabled is true."
+            )
+        annualized_volatility_threshold = float(annualized_volatility_threshold)
+        if annualized_volatility_threshold <= 0.0:
+            raise ValueError("risk_switch.annualized_volatility_threshold must be > 0.")
+
+    return {
+        "enabled": enabled,
+        "lookback_days": lookback_days,
+        "annualized_volatility_threshold": (
+            float(annualized_volatility_threshold) if annualized_volatility_threshold is not None else None
+        ),
+        "reduction_fraction": reduction_fraction,
+        "destination_assets": destination_assets,
+    }
+
+
 def weight_drift_table(
     target_weights: dict[str, float] | pd.Series,
     current_weights: dict[str, float] | pd.Series,

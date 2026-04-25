@@ -96,6 +96,16 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         ).to_csv(table_dir / "trend_filter_summary.csv")
         pd.DataFrame(
             {
+                "observations": [3],
+                "risk_switch_active_days": [1],
+                "risk_switch_active_ratio": [1.0 / 3.0],
+                "avg_reduced_assets": [1.0 / 3.0],
+                "max_reduced_assets": [1],
+            },
+            index=pd.Index(["balanced"], name="portfolio"),
+        ).to_csv(table_dir / "risk_switch_summary.csv")
+        pd.DataFrame(
+            {
                 "portfolio": ["balanced"],
                 "metric": ["max_drawdown"],
                 "threshold": [0.25],
@@ -237,6 +247,7 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Data Quality Summary" in html
         assert "ETF Metadata Summary" in html
         assert "Trend Filter Summary" in html
+        assert "Risk Switch Summary" in html
         assert "Risk Limit Checks" in html
         assert "Risk Limit Breaches" in html
         assert "Risk Limit Breach Summary" in html
@@ -312,6 +323,15 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
                     "max_reduced_assets": [1],
                 }
             ),
+            "risk_switch_summary": pd.DataFrame(
+                {
+                    "observations": [3],
+                    "risk_switch_active_days": [1],
+                    "risk_switch_active_ratio": [1.0 / 3.0],
+                    "avg_reduced_assets": [1.0 / 3.0],
+                    "max_reduced_assets": [1],
+                }
+            ),
             "risk_limit_checks": pd.DataFrame(
                 {
                     "threshold": [0.25],
@@ -376,6 +396,8 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["data_quality_summary"].iloc[0]["observations"] == "2"
     assert tables["trend_filter_summary"].iloc[0]["trend_active_ratio"] == "66.67%"
     assert tables["trend_filter_summary"].iloc[0]["max_reduced_assets"] == "1"
+    assert tables["risk_switch_summary"].iloc[0]["risk_switch_active_ratio"] == "33.33%"
+    assert tables["risk_switch_summary"].iloc[0]["max_reduced_assets"] == "1"
     assert tables["risk_limit_checks"].loc["balanced:max_drawdown", "threshold"] == "25.00%"
     assert tables["risk_limit_checks"].loc["balanced:max_drawdown", "observed"] == "-20.00%"
     assert tables["risk_limit_breaches"].loc["balanced:max_drawdown", "observed"] == "-30.00%"

@@ -13,6 +13,7 @@ REQUIRED_TABLES = [
     "benchmark_annual_excess_returns.csv",
     "benchmark_drawdown_comparisons.csv",
     "trend_filter_summary.csv",
+    "risk_switch_summary.csv",
     "rebalance_reason.csv",
     "rebalance_reason_summary.csv",
     "macro_observation_summary.csv",

@@ -146,6 +146,42 @@ def validate_rebalance_schema(config: dict[str, Any], config_path: str | Path) -
         if reduction_fraction > 1.0:
             raise ValueError(f"{config_path}: trend_filter.reduction_fraction must be <= 1.0.")
 
+    risk_switch = config.get("risk_switch")
+    if risk_switch is not None:
+        risk_switch_mapping = _require_mapping(risk_switch, f"{config_path}: risk_switch")
+        enabled = _require_bool(risk_switch_mapping.get("enabled"), f"{config_path}: risk_switch.enabled")
+        lookback_days = _require_non_negative_number(
+            risk_switch_mapping.get("lookback_days"),
+            f"{config_path}: risk_switch.lookback_days",
+        )
+        if lookback_days < 2:
+            raise ValueError(f"{config_path}: risk_switch.lookback_days must be >= 2.")
+        reduction_fraction = _require_non_negative_number(
+            risk_switch_mapping.get("reduction_fraction", 0.50),
+            f"{config_path}: risk_switch.reduction_fraction",
+        )
+        if reduction_fraction > 1.0:
+            raise ValueError(f"{config_path}: risk_switch.reduction_fraction must be <= 1.0.")
+        destination_assets = risk_switch_mapping.get("destination_assets", [])
+        if not isinstance(destination_assets, list):
+            raise ValueError(f"{config_path}: risk_switch.destination_assets must be a list.")
+        for idx, asset in enumerate(destination_assets):
+            _require_string(asset, f"{config_path}: risk_switch.destination_assets[{idx}]")
+        threshold = risk_switch_mapping.get("annualized_volatility_threshold")
+        if threshold is not None:
+            numeric_threshold = _require_non_negative_number(
+                threshold,
+                f"{config_path}: risk_switch.annualized_volatility_threshold",
+            )
+            if numeric_threshold <= 0:
+                raise ValueError(
+                    f"{config_path}: risk_switch.annualized_volatility_threshold must be > 0 when provided."
+                )
+        if enabled and threshold is None:
+            raise ValueError(
+                f"{config_path}: risk_switch.annualized_volatility_threshold is required when risk_switch.enabled is true."
+            )
+
 
 def validate_risk_limits_schema(config: dict[str, Any], config_path: str | Path) -> None:
     """Validate risk-limit YAML shape and required fields."""

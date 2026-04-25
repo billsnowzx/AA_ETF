@@ -339,6 +339,22 @@ def _format_macro_regime_summary(macro_regime_summary: pd.DataFrame | None) -> p
     return formatted
 
 
+def _format_risk_switch_summary(risk_switch_summary: pd.DataFrame | None) -> pd.DataFrame:
+    """Format risk-switch summary diagnostics for report presentation."""
+    if risk_switch_summary is None or risk_switch_summary.empty:
+        return pd.DataFrame()
+
+    formatted = risk_switch_summary.astype(object).copy()
+    for column in ["observations", "risk_switch_active_days", "max_reduced_assets"]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(lambda value: _format_decimal(value, digits=0))
+    if "risk_switch_active_ratio" in formatted.columns:
+        formatted["risk_switch_active_ratio"] = formatted["risk_switch_active_ratio"].map(_format_percent)
+    if "avg_reduced_assets" in formatted.columns:
+        formatted["avg_reduced_assets"] = formatted["avg_reduced_assets"].map(_format_decimal)
+    return formatted
+
+
 def build_run_configuration_summary(
     *,
     start: str,
@@ -382,6 +398,7 @@ def build_phase1_report_markdown(
     report_date: str,
     data_quality_summary: pd.DataFrame | None = None,
     trend_filter_summary: pd.DataFrame | None = None,
+    risk_switch_summary: pd.DataFrame | None = None,
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     rolling_correlation: pd.DataFrame | None = None,
@@ -475,6 +492,7 @@ def build_phase1_report_markdown(
     portfolio_risk_contribution_view = _format_portfolio_risk_contribution(portfolio_risk_contribution)
     macro_regime_view = _format_macro_regime_summary(macro_regime_summary)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
+    risk_switch_view = _format_risk_switch_summary(risk_switch_summary)
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
     note_lines = "\n".join(f"- {note}" for note in notes) if notes else "- None"
@@ -537,6 +555,10 @@ Generated: {report_date}
 ## Trend Filter Summary
 
 {dataframe_to_markdown_table(trend_view) if not trend_view.empty else "No trend filter summary generated."}
+
+## Risk Switch Summary
+
+{dataframe_to_markdown_table(risk_switch_view) if not risk_switch_view.empty else "No risk switch summary generated."}
 
 ## Rebalance Reason Summary
 
@@ -610,6 +632,7 @@ def build_phase1_report_html(
     report_date: str,
     data_quality_summary: pd.DataFrame | None = None,
     trend_filter_summary: pd.DataFrame | None = None,
+    risk_switch_summary: pd.DataFrame | None = None,
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     rolling_correlation: pd.DataFrame | None = None,
@@ -703,6 +726,7 @@ def build_phase1_report_html(
     portfolio_risk_contribution_view = _format_portfolio_risk_contribution(portfolio_risk_contribution)
     macro_regime_view = _format_macro_regime_summary(macro_regime_summary)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
+    risk_switch_view = _format_risk_switch_summary(risk_switch_summary)
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
 
     note_items = "".join(f"<li>{escape(note)}</li>" for note in notes) if notes else "<li>None</li>"
@@ -759,6 +783,7 @@ def build_phase1_report_html(
   <section><h2>Latest Rolling Metrics</h2>{dataframe_to_html_table(rolling_view) if not rolling_view.empty else "<p>No rolling metrics generated.</p>"}</section>
   <section><h2>Rolling Correlation (VTI vs AGG)</h2>{dataframe_to_html_table(rolling_correlation_view.tail(20)) if not rolling_correlation_view.empty else "<p>No rolling correlation generated.</p>"}</section>
   <section><h2>Trend Filter Summary</h2>{dataframe_to_html_table(trend_view) if not trend_view.empty else "<p>No trend filter summary generated.</p>"}</section>
+  <section><h2>Risk Switch Summary</h2>{dataframe_to_html_table(risk_switch_view) if not risk_switch_view.empty else "<p>No risk switch summary generated.</p>"}</section>
   <section><h2>Rebalance Reason Summary</h2>{dataframe_to_html_table(rebalance_summary_view) if not rebalance_summary_view.empty else "<p>No rebalance reason summary generated.</p>"}</section>
   <section><h2>Recent Rebalance Events</h2>{dataframe_to_html_table(recent_rebalance_events) if not recent_rebalance_events.empty else "<p>No recent rebalance events generated.</p>"}</section>
   <section><h2>Risk Limit Checks</h2>{dataframe_to_html_table(risk_limit_view) if not risk_limit_view.empty else "<p>No risk limit checks generated.</p>"}</section>
@@ -795,6 +820,7 @@ def write_phase1_report(
     report_date: str,
     data_quality_summary: pd.DataFrame | None = None,
     trend_filter_summary: pd.DataFrame | None = None,
+    risk_switch_summary: pd.DataFrame | None = None,
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     rolling_correlation: pd.DataFrame | None = None,
@@ -827,6 +853,7 @@ def write_phase1_report(
         chart_paths=chart_paths,
         report_date=report_date,
         trend_filter_summary=trend_filter_summary,
+        risk_switch_summary=risk_switch_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         rolling_correlation=rolling_correlation,
         rebalance_reason_table=rebalance_reason_table,
@@ -861,6 +888,7 @@ def write_phase1_html_report(
     report_date: str,
     data_quality_summary: pd.DataFrame | None = None,
     trend_filter_summary: pd.DataFrame | None = None,
+    risk_switch_summary: pd.DataFrame | None = None,
     run_configuration: pd.DataFrame | None = None,
     rolling_metric_snapshot: pd.DataFrame | None = None,
     rolling_correlation: pd.DataFrame | None = None,
@@ -893,6 +921,7 @@ def write_phase1_html_report(
         chart_paths=chart_paths,
         report_date=report_date,
         trend_filter_summary=trend_filter_summary,
+        risk_switch_summary=risk_switch_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         rolling_correlation=rolling_correlation,
         rebalance_reason_table=rebalance_reason_table,

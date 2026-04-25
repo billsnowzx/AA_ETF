@@ -220,3 +220,46 @@ def test_run_fixed_weight_backtest_drift_only_mode_triggers_on_threshold_breach(
 
     assert result["rebalance_flags"].tolist() == [True, True]
     assert result["rebalance_reasons"].tolist() == ["initial", "drift"]
+
+
+def test_run_fixed_weight_backtest_risk_switch_reduces_risk_assets_on_high_volatility() -> None:
+    index = pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"])
+    asset_returns = pd.DataFrame(
+        {
+            "VTI": [0.10, -0.10, 0.10, 0.0],
+            "AGG": [0.0, 0.0, 0.0, 0.0],
+        },
+        index=index,
+    )
+
+    result = run_fixed_weight_backtest(
+        asset_returns,
+        {"VTI": 0.6, "AGG": 0.4},
+        rebalance_frequency="quarterly",
+        one_way_bps=0.0,
+        rebalance_trigger_mode="calendar",
+        risk_switch={
+            "enabled": True,
+            "lookback_days": 2,
+            "annualized_volatility_threshold": 0.50,
+            "reduction_fraction": 0.50,
+            "risk_assets": ["VTI"],
+            "destination_assets": ["AGG"],
+        },
+        periods_per_year=252,
+    )
+
+    weights_start = result["weights_start"]
+    risk_switch_active = result["risk_switch_active"]
+    risk_switch_scales = result["risk_switch_scales"]
+    rebalance_reasons = result["rebalance_reasons"]
+
+    assert bool(risk_switch_active.loc[pd.Timestamp("2024-01-04")]) is True
+    assert math.isclose(float(risk_switch_scales.loc[pd.Timestamp("2024-01-04"), "VTI"]), 0.5, rel_tol=1e-9)
+    risk_switch_rebalance_dates = [
+        date for date, reason in rebalance_reasons.items() if "risk_switch" in str(reason)
+    ]
+    assert risk_switch_rebalance_dates
+    first_switch_date = risk_switch_rebalance_dates[0]
+    assert math.isclose(float(weights_start.loc[first_switch_date, "VTI"]), 0.3, rel_tol=1e-9)
+    assert math.isclose(float(weights_start.loc[first_switch_date, "AGG"]), 0.7, rel_tol=1e-9)

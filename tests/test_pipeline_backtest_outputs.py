@@ -11,6 +11,8 @@ from run_pipeline import (
     build_pipeline_health_summary,
     build_nav_table,
     build_rebalance_reason_table,
+    build_risk_switch_overlay_settings,
+    build_risk_switch_summary,
     build_trend_filter_summary,
     build_trend_filter_overlay_settings,
     build_backtest_policy_tables,
@@ -152,6 +154,46 @@ def test_build_trend_filter_overlay_settings_enabled_uses_equity_and_reit_assets
         rebalance_config_path.unlink(missing_ok=True)
 
 
+def test_build_risk_switch_overlay_settings_selects_equity_like_risk_assets() -> None:
+    rebalance_config_path = Path("data/cache") / f"test_rebalance_risk_switch_{uuid.uuid4().hex}.yaml"
+    rebalance_config_path.parent.mkdir(parents=True, exist_ok=True)
+    rebalance_config_path.write_text(
+        "\n".join(
+            [
+                "standard_rebalance:",
+                "  frequency: quarterly",
+                "weight_drift_rule:",
+                "  enabled: true",
+                "  relative_deviation_threshold: 0.20",
+                "risk_switch:",
+                "  enabled: true",
+                "  lookback_days: 20",
+                "  annualized_volatility_threshold: 0.18",
+                "  reduction_fraction: 0.50",
+                "  destination_assets:",
+                "    - AGG",
+                "    - GLD",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    try:
+        settings = build_risk_switch_overlay_settings(
+            rebalance_config=rebalance_config_path,
+            universe_config="config/etf_universe.yaml",
+            backtest_tickers=["VTI", "VEA", "IEMG", "AGG", "GLD", "VNQ"],
+        )
+        assert settings["enabled"] is True
+        assert settings["lookback_days"] == 20
+        assert math.isclose(float(settings["annualized_volatility_threshold"]), 0.18, rel_tol=1e-9)
+        assert settings["risk_assets"] == ["VTI", "VEA", "IEMG", "VNQ"]
+        assert settings["destination_assets"] == ["AGG", "GLD"]
+    finally:
+        rebalance_config_path.unlink(missing_ok=True)
+
+
 def test_build_trend_filter_summary_counts_active_days_and_reduced_assets() -> None:
     index = pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"])
     strategy_result = {
@@ -170,6 +212,28 @@ def test_build_trend_filter_summary_counts_active_days_and_reduced_assets() -> N
     assert int(summary.loc["balanced", "observations"]) == 3
     assert int(summary.loc["balanced", "trend_active_days"]) == 2
     assert math.isclose(float(summary.loc["balanced", "trend_active_ratio"]), 2.0 / 3.0, rel_tol=1e-9)
+    assert math.isclose(float(summary.loc["balanced", "avg_reduced_assets"]), 2.0 / 3.0, rel_tol=1e-9)
+    assert int(summary.loc["balanced", "max_reduced_assets"]) == 1
+
+
+def test_build_risk_switch_summary_counts_active_days_and_reduced_assets() -> None:
+    index = pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"])
+    strategy_result = {
+        "risk_switch_active": pd.Series([False, True, True], index=index, name="risk_switch_active"),
+        "risk_switch_scales": pd.DataFrame(
+            {
+                "VTI": [1.0, 0.5, 0.5],
+                "AGG": [1.0, 1.0, 1.0],
+            },
+            index=index,
+        ),
+    }
+
+    summary = build_risk_switch_summary("balanced", strategy_result)
+
+    assert int(summary.loc["balanced", "observations"]) == 3
+    assert int(summary.loc["balanced", "risk_switch_active_days"]) == 2
+    assert math.isclose(float(summary.loc["balanced", "risk_switch_active_ratio"]), 2.0 / 3.0, rel_tol=1e-9)
     assert math.isclose(float(summary.loc["balanced", "avg_reduced_assets"]), 2.0 / 3.0, rel_tol=1e-9)
     assert int(summary.loc["balanced", "max_reduced_assets"]) == 1
 
@@ -319,8 +383,11 @@ def test_build_summary_tables_and_write_outputs() -> None:
         assert (output_dir / "asset_risk_snapshot.csv").exists()
         assert (output_dir / "portfolio_risk_contribution.csv").exists()
         assert (output_dir / "trend_filter_summary.csv").exists()
+        assert (output_dir / "risk_switch_summary.csv").exists()
         assert (output_dir / "trend_filter_active.csv").exists()
         assert (output_dir / "trend_filter_scales.csv").exists()
+        assert (output_dir / "risk_switch_active.csv").exists()
+        assert (output_dir / "risk_switch_scales.csv").exists()
         assert (output_dir / "rolling_volatility.csv").exists()
         assert (output_dir / "rolling_sharpe.csv").exists()
         assert (output_dir / "rolling_correlation.csv").exists()

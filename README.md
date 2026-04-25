@@ -20,6 +20,7 @@ Phase 1 includes:
 - Static-weight portfolio return and transaction-cost helpers
 - Config-driven rebalance drift checks
 - Fixed-weight pandas backtest engine
+- Volatility-triggered risk switch overlay (config-driven, optional)
 - ETF summary and Phase 1 scoring
 - Liquidity screening based on dollar volume
 - A simple pipeline runner for download, cleaning, and liquidity summary generation
@@ -122,6 +123,7 @@ This command will:
 - generate `performance_summary.csv`, `annual_return_table.csv`, `turnover_summary.csv`, `benchmark_comparisons.csv`, `nav_series.csv`, and `return_series.csv`
 - generate `benchmark_annual_excess_returns.csv` and `benchmark_drawdown_comparisons.csv`
 - generate `trend_filter_summary.csv`, `trend_filter_active.csv`, and `trend_filter_scales.csv`
+- generate `risk_switch_summary.csv`, `risk_switch_active.csv`, and `risk_switch_scales.csv`
 - generate `rebalance_reason.csv` with per-date rebalance trigger reasons
 - generate `risk_limit_checks.csv` with config-driven risk-limit audit checks
 - generate `rolling_volatility.csv`, `rolling_sharpe.csv`, and `drawdown_series.csv`

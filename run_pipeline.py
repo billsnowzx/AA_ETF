@@ -42,6 +42,7 @@ from src.portfolio.policy import (
 )
 from src.portfolio.rebalancer import load_standard_rebalance_frequency
 from src.portfolio.rebalancer import load_trend_filter_settings
+from src.portfolio.rebalancer import load_risk_switch_settings
 from src.portfolio.rebalancer import (
     load_rebalance_trigger_mode,
     load_drift_rule_enabled,
@@ -367,6 +368,7 @@ def run_strategy_backtests(
     template_name: str | None = None,
     adj_close: pd.DataFrame | None = None,
     trend_filter_settings: dict[str, object] | None = None,
+    risk_switch_settings: dict[str, object] | None = None,
 ) -> tuple[str, dict[str, pd.Series | pd.DataFrame], dict[str, dict[str, pd.Series | pd.DataFrame]]]:
     """Run the default strategy portfolio and configured benchmarks."""
     strategy_name = template_name or "balanced"
@@ -404,6 +406,7 @@ def run_strategy_backtests(
         benchmark_returns=benchmark_return_series,
         adj_close=adj_close,
         trend_filter=trend_filter_settings,
+        risk_switch=risk_switch_settings,
         rebalance_trigger_mode=rebalance_trigger_mode,
         drift_threshold=drift_threshold,
         drift_rule_enabled=drift_rule_enabled,
@@ -464,6 +467,46 @@ def build_backtest_policy_tables(
     )
     summary = summarize_backtest_universe_validation(validation)
     return validation, summary
+
+
+def build_risk_switch_overlay_settings(
+    rebalance_config: str | Path,
+    universe_config: str | Path,
+    backtest_tickers: list[str],
+) -> dict[str, object]:
+    """Build risk-switch settings with risk assets derived from universe metadata."""
+    settings = load_risk_switch_settings(rebalance_config)
+    if not bool(settings["enabled"]):
+        return {
+            "enabled": False,
+            "lookback_days": int(settings["lookback_days"]),
+            "annualized_volatility_threshold": settings["annualized_volatility_threshold"],
+            "reduction_fraction": float(settings["reduction_fraction"]),
+            "risk_assets": [],
+            "destination_assets": [
+                asset for asset in settings["destination_assets"] if asset in backtest_tickers
+            ],
+        }
+
+    universe_metadata = load_enabled_universe(universe_config)
+    destination_assets = [asset for asset in settings["destination_assets"] if asset in backtest_tickers]
+    risk_assets: list[str] = []
+    destination_set = set(destination_assets)
+    for ticker in backtest_tickers:
+        if ticker not in universe_metadata.index or ticker in destination_set:
+            continue
+        asset_class = str(universe_metadata.loc[ticker, "asset_class"] or "").lower()
+        if "equity" in asset_class or "reit" in asset_class:
+            risk_assets.append(ticker)
+
+    return {
+        "enabled": True,
+        "lookback_days": int(settings["lookback_days"]),
+        "annualized_volatility_threshold": float(settings["annualized_volatility_threshold"]),
+        "reduction_fraction": float(settings["reduction_fraction"]),
+        "risk_assets": risk_assets,
+        "destination_assets": destination_assets,
+    }
 
 
 def build_performance_summary(
@@ -596,6 +639,62 @@ def build_trend_filter_summary(
     ).set_index("portfolio")
 
 
+def build_risk_switch_summary(
+    strategy_name: str,
+    strategy_result: dict[str, pd.Series | pd.DataFrame],
+) -> pd.DataFrame:
+    """Build a compact summary table for risk-switch activity."""
+    risk_switch_active = strategy_result.get("risk_switch_active")
+    risk_switch_scales = strategy_result.get("risk_switch_scales")
+
+    if not isinstance(risk_switch_active, pd.Series) or risk_switch_active.empty:
+        return pd.DataFrame(
+            [
+                {
+                    "portfolio": strategy_name,
+                    "observations": 0,
+                    "risk_switch_active_days": 0,
+                    "risk_switch_active_ratio": 0.0,
+                    "avg_reduced_assets": 0.0,
+                    "max_reduced_assets": 0,
+                    "first_active_date": None,
+                    "last_active_date": None,
+                }
+            ]
+        ).set_index("portfolio")
+
+    active_mask = risk_switch_active.astype(bool)
+    observations = int(len(active_mask))
+    active_days = int(active_mask.sum())
+    active_ratio = float(active_days / observations) if observations > 0 else 0.0
+
+    avg_reduced_assets = 0.0
+    max_reduced_assets = 0
+    if isinstance(risk_switch_scales, pd.DataFrame) and not risk_switch_scales.empty:
+        reduced_counts = risk_switch_scales.lt(1.0).sum(axis=1)
+        avg_reduced_assets = float(reduced_counts.mean())
+        max_reduced_assets = int(reduced_counts.max())
+
+    active_dates = risk_switch_active.index[active_mask]
+    first_active_date = active_dates.min() if len(active_dates) > 0 else None
+    last_active_date = active_dates.max() if len(active_dates) > 0 else None
+
+    return pd.DataFrame(
+        [
+            {
+                "portfolio": strategy_name,
+                "observations": observations,
+                "risk_switch_active_days": active_days,
+                "risk_switch_active_ratio": active_ratio,
+                "avg_reduced_assets": avg_reduced_assets,
+                "max_reduced_assets": max_reduced_assets,
+                "first_active_date": first_active_date,
+                "last_active_date": last_active_date,
+            }
+        ]
+    ).set_index("portfolio")
+
+
 def build_risk_matrix_outputs(asset_returns: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Build covariance and correlation outputs in matrix and long-table forms."""
     covariance = covariance_matrix(asset_returns)
@@ -658,6 +757,7 @@ def write_backtest_outputs(
     benchmark_annual_excess_returns = strategy_result["benchmark_annual_excess_returns"]
     benchmark_drawdown_comparisons = strategy_result["benchmark_drawdown_comparisons"]
     trend_filter_summary = build_trend_filter_summary(strategy_name, strategy_result)
+    risk_switch_summary = build_risk_switch_summary(strategy_name, strategy_result)
     rebalance_reason_table = build_rebalance_reason_table(strategy_name, strategy_result, benchmark_results)
     rebalance_reason_summary = build_rebalance_reason_summary(rebalance_reason_table)
     nav_table = build_nav_table(strategy_name, strategy_result, benchmark_results)
@@ -675,6 +775,7 @@ def write_backtest_outputs(
     benchmark_annual_excess_returns.to_csv(output_path / "benchmark_annual_excess_returns.csv", index=True)
     benchmark_drawdown_comparisons.to_csv(output_path / "benchmark_drawdown_comparisons.csv", index=True)
     trend_filter_summary.to_csv(output_path / "trend_filter_summary.csv", index=True)
+    risk_switch_summary.to_csv(output_path / "risk_switch_summary.csv", index=True)
     nav_table.to_csv(output_path / "nav_series.csv", index=True)
     return_table.to_csv(output_path / "return_series.csv", index=True)
     rebalance_reason_table.to_csv(output_path / "rebalance_reason.csv", index=True)
@@ -692,6 +793,10 @@ def write_backtest_outputs(
         strategy_result["trend_filter_active"].to_csv(output_path / "trend_filter_active.csv", index=True)
     if "trend_filter_scales" in strategy_result:
         strategy_result["trend_filter_scales"].to_csv(output_path / "trend_filter_scales.csv", index=True)
+    if "risk_switch_active" in strategy_result:
+        strategy_result["risk_switch_active"].to_csv(output_path / "risk_switch_active.csv", index=True)
+    if "risk_switch_scales" in strategy_result:
+        strategy_result["risk_switch_scales"].to_csv(output_path / "risk_switch_scales.csv", index=True)
 
     LOGGER.info("Saved performance summary to %s", output_path / "performance_summary.csv")
     LOGGER.info("Saved turnover summary to %s", output_path / "turnover_summary.csv")
@@ -700,6 +805,7 @@ def write_backtest_outputs(
     LOGGER.info("Saved benchmark annual excess returns to %s", output_path / "benchmark_annual_excess_returns.csv")
     LOGGER.info("Saved benchmark drawdown comparisons to %s", output_path / "benchmark_drawdown_comparisons.csv")
     LOGGER.info("Saved trend filter summary to %s", output_path / "trend_filter_summary.csv")
+    LOGGER.info("Saved risk switch summary to %s", output_path / "risk_switch_summary.csv")
     LOGGER.info("Saved rebalance reasons to %s", output_path / "rebalance_reason.csv")
     LOGGER.info("Saved rebalance reason summary to %s", output_path / "rebalance_reason_summary.csv")
     LOGGER.info("Saved covariance matrix to %s", output_path / "covariance_matrix.csv")
@@ -711,6 +817,10 @@ def write_backtest_outputs(
         LOGGER.info("Saved trend filter active flags to %s", output_path / "trend_filter_active.csv")
     if "trend_filter_scales" in strategy_result:
         LOGGER.info("Saved trend filter scales to %s", output_path / "trend_filter_scales.csv")
+    if "risk_switch_active" in strategy_result:
+        LOGGER.info("Saved risk switch active flags to %s", output_path / "risk_switch_active.csv")
+    if "risk_switch_scales" in strategy_result:
+        LOGGER.info("Saved risk switch scales to %s", output_path / "risk_switch_scales.csv")
 
 
 def build_nav_table(
@@ -1307,6 +1417,11 @@ def main() -> None:
         universe_config=args.universe_config,
         backtest_tickers=backtest_tickers,
     )
+    risk_switch_settings = build_risk_switch_overlay_settings(
+        rebalance_config=args.rebalance_config,
+        universe_config=args.universe_config,
+        backtest_tickers=backtest_tickers,
+    )
 
     strategy_name, strategy_result, benchmark_results = run_strategy_backtests(
         asset_returns,
@@ -1316,6 +1431,7 @@ def main() -> None:
         template_name=args.template_name,
         adj_close=backtest_adj_close,
         trend_filter_settings=trend_filter_settings,
+        risk_switch_settings=risk_switch_settings,
     )
     policy_validation, policy_summary = build_backtest_policy_tables(
         strategy_name=strategy_name,
@@ -1363,6 +1479,7 @@ def main() -> None:
     performance_summary = build_performance_summary(strategy_name, strategy_result, benchmark_results)
     turnover_summary = build_turnover_summary(strategy_name, strategy_result, benchmark_results)
     trend_filter_summary = build_trend_filter_summary(strategy_name, strategy_result)
+    risk_switch_summary = build_risk_switch_summary(strategy_name, strategy_result)
     rebalance_reason_table = build_rebalance_reason_table(strategy_name, strategy_result, benchmark_results)
     risk_limits = load_risk_limits(args.risk_limits_config)
     risk_limit_checks = build_portfolio_risk_limit_checks(performance_summary, risk_limits)
@@ -1391,6 +1508,21 @@ def main() -> None:
             + ", ".join(trend_filter_settings["assets"])
             + f" (moving_average_days={trend_filter_settings['moving_average_days']}, "
             + f"reduction_fraction={trend_filter_settings['reduction_fraction']:.2f})"
+        )
+    if bool(risk_switch_settings["enabled"]):
+        report_notes.append(
+            "Risk switch enabled: "
+            + f"lookback_days={risk_switch_settings['lookback_days']}, "
+            + f"annualized_volatility_threshold={risk_switch_settings['annualized_volatility_threshold']:.2%}, "
+            + f"reduction_fraction={risk_switch_settings['reduction_fraction']:.2f}, "
+            + "risk_assets="
+            + (", ".join(risk_switch_settings["risk_assets"]) if risk_switch_settings["risk_assets"] else "none")
+            + ", destination_assets="
+            + (
+                ", ".join(risk_switch_settings["destination_assets"])
+                if risk_switch_settings["destination_assets"]
+                else "none"
+            )
         )
     if not risk_limit_breaches.empty:
         breach_labels = ", ".join(
@@ -1434,6 +1566,7 @@ def main() -> None:
         output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.md",
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         trend_filter_summary=trend_filter_summary,
+        risk_switch_summary=risk_switch_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         rolling_correlation=rolling_outputs["rolling_correlation"],
         rebalance_reason_table=rebalance_reason_table,
@@ -1464,6 +1597,7 @@ def main() -> None:
         output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.html",
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         trend_filter_summary=trend_filter_summary,
+        risk_switch_summary=risk_switch_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         rolling_correlation=rolling_outputs["rolling_correlation"],
         rebalance_reason_table=rebalance_reason_table,
@@ -1548,6 +1682,7 @@ def main() -> None:
         output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.md",
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         trend_filter_summary=trend_filter_summary,
+        risk_switch_summary=risk_switch_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         rolling_correlation=rolling_outputs["rolling_correlation"],
         rebalance_reason_table=rebalance_reason_table,
@@ -1578,6 +1713,7 @@ def main() -> None:
         output_path=Path(args.report_dir) / f"{strategy_name}_phase1_report.html",
         report_date=asset_returns.index.max().strftime("%Y-%m-%d"),
         trend_filter_summary=trend_filter_summary,
+        risk_switch_summary=risk_switch_summary,
         rolling_metric_snapshot=rolling_metric_snapshot,
         rolling_correlation=rolling_outputs["rolling_correlation"],
         rebalance_reason_table=rebalance_reason_table,

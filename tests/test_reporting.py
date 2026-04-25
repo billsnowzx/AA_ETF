@@ -76,6 +76,19 @@ def _sample_trend_filter_summary() -> pd.DataFrame:
     )
 
 
+def _sample_risk_switch_summary() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "observations": [4],
+            "risk_switch_active_days": [1],
+            "risk_switch_active_ratio": [0.25],
+            "avg_reduced_assets": [0.25],
+            "max_reduced_assets": [1],
+        },
+        index=pd.Index(["balanced"], name="portfolio"),
+    )
+
+
 def _sample_rebalance_reason_table() -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -262,6 +275,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         chart_paths=chart_paths,
         report_date="2026-04-18",
         trend_filter_summary=_sample_trend_filter_summary(),
+        risk_switch_summary=_sample_risk_switch_summary(),
         rolling_metric_snapshot=rolling_metric_snapshot,
         rolling_correlation=rolling_correlation,
         rebalance_reason_table=_sample_rebalance_reason_table(),
@@ -286,6 +300,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "## Latest Rolling Metrics" in report
     assert "## Rolling Correlation (VTI vs AGG)" in report
     assert "## Trend Filter Summary" in report
+    assert "## Risk Switch Summary" in report
     assert "## Rebalance Reason Summary" in report
     assert "## Recent Rebalance Events" in report
     assert "## Risk Limit Checks" in report
@@ -300,6 +315,7 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "missing_volume" in report
     assert "12.00%" in report
     assert "0.2500" in report
+    assert "25.00%" in report
     assert "25.00%" in report
     assert "30.00%" in report
     assert "50.00%" in report
@@ -380,6 +396,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
         chart_paths={"nav_chart": Path("outputs/figures/balanced_nav.png")},
         report_date="2026-04-19",
         trend_filter_summary=_sample_trend_filter_summary(),
+        risk_switch_summary=_sample_risk_switch_summary(),
         run_configuration=_sample_run_configuration(),
         rolling_metric_snapshot=pd.DataFrame(
             {"balanced": [0.12, 0.8]},
@@ -407,6 +424,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "<h2>Latest Rolling Metrics</h2>" in report
     assert "<h2>Rolling Correlation (VTI vs AGG)</h2>" in report
     assert "<h2>Trend Filter Summary</h2>" in report
+    assert "<h2>Risk Switch Summary</h2>" in report
     assert "<h2>Rebalance Reason Summary</h2>" in report
     assert "<h2>Recent Rebalance Events</h2>" in report
     assert "<h2>Risk Limit Checks</h2>" in report
@@ -421,6 +439,7 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "missing_volume" in report
     assert "12.00%" in report
     assert "0.2500" in report
+    assert "25.00%" in report
     assert "25.00%" in report
     assert "30.00%" in report
     assert "50.00%" in report
@@ -577,6 +596,7 @@ def test_write_phase1_report_creates_markdown_file() -> None:
             output_path=output_path,
             report_date="2026-04-18",
             trend_filter_summary=_sample_trend_filter_summary(),
+            risk_switch_summary=_sample_risk_switch_summary(),
             run_configuration=_sample_run_configuration(),
             risk_limit_checks=_sample_risk_limit_checks(),
             risk_limit_breaches=_sample_risk_limit_breaches(),
@@ -667,6 +687,7 @@ def test_write_phase1_html_report_creates_html_file() -> None:
             output_path=output_path,
             report_date="2026-04-19",
             trend_filter_summary=_sample_trend_filter_summary(),
+            risk_switch_summary=_sample_risk_switch_summary(),
             run_configuration=_sample_run_configuration(),
             risk_limit_checks=_sample_risk_limit_checks(),
             risk_limit_breaches=_sample_risk_limit_breaches(),

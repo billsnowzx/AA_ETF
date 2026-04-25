@@ -4,6 +4,7 @@ from src.portfolio.rebalancer import (
     breached_rebalance_assets,
     load_drift_rule_enabled,
     load_rebalance_trigger_mode,
+    load_risk_switch_settings,
     load_relative_drift_threshold,
     load_standard_rebalance_frequency,
     load_trend_filter_settings,
@@ -19,6 +20,7 @@ def test_load_rebalance_rule_values_from_config() -> None:
     drift_enabled = load_drift_rule_enabled("config/rebalance_rules.yaml")
     threshold = load_relative_drift_threshold("config/rebalance_rules.yaml")
     trend_filter = load_trend_filter_settings("config/rebalance_rules.yaml")
+    risk_switch = load_risk_switch_settings("config/rebalance_rules.yaml")
 
     assert frequency == "quarterly"
     assert trigger_mode == "calendar"
@@ -27,6 +29,10 @@ def test_load_rebalance_rule_values_from_config() -> None:
     assert trend_filter["enabled"] is False
     assert trend_filter["moving_average_months"] == 10
     assert math.isclose(float(trend_filter["reduction_fraction"]), 0.50, rel_tol=1e-9)
+    assert risk_switch["enabled"] is False
+    assert risk_switch["lookback_days"] == 20
+    assert risk_switch["annualized_volatility_threshold"] is None
+    assert risk_switch["destination_assets"] == ["AGG", "GLD"]
 
 
 def test_weight_drift_table_matches_spec_example() -> None:
