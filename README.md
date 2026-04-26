@@ -236,8 +236,11 @@ python -m src.dashboard.app --host 127.0.0.1 --port 8000
 ## Example usage
 
 ```python
+import pandas as pd
+
 from src.data.fetch_prices import fetch_prices
 from src.data.clean_data import batch_clean_price_frames
+from src.backtest.scenarios import run_robustness_scenarios
 from src.portfolio.weights import load_portfolio_template
 from src.universe.liquidity_filter import filter_liquid_universe
 
@@ -250,6 +253,18 @@ raw_frames = fetch_prices(
 clean_frames = batch_clean_price_frames(raw_frames)
 liquid_tickers, liquidity_table = filter_liquid_universe(clean_frames)
 balanced_weights = load_portfolio_template("config/portfolio_templates.yaml")
+
+# Optional robustness sweep for rebalance frequency and cost sensitivity
+asset_returns = pd.concat(
+    {ticker: frame["adj_close"].pct_change() for ticker, frame in clean_frames.items()},
+    axis=1,
+).dropna(how="any")
+scenario_table = run_robustness_scenarios(
+    asset_returns=asset_returns,
+    target_weights=balanced_weights,
+    rebalance_frequencies=["monthly", "quarterly"],
+    one_way_bps_values=[0.0, 5.0, 10.0],
+)
 ```
 
 ## Design principles
