@@ -185,7 +185,18 @@ This runs:
 - `run_pipeline.py` with output validation (`--fail-on-missing-outputs --fail-on-empty-outputs`)
 - static dashboard generation to `outputs/reports/dashboard.html`
 
-### 2) Deterministic run metadata
+### 2) Robustness sweeps (frequency/cost + start-date sensitivity)
+
+```bash
+python scripts/run_robustness.py --start 2020-01-01 --end 2024-12-31
+```
+
+This writes:
+
+- `outputs/tables/robustness_scenarios.csv`
+- `outputs/tables/start_date_robustness.csv`
+
+### 3) Deterministic run metadata
 
 ```bash
 python scripts/run_phase1.py --start 2020-01-01 --end 2024-12-31 --as-of-date 2024-12-31 --seed 7
@@ -196,19 +207,19 @@ This records deterministic metadata in `outputs/tables/pipeline_manifest.json` u
 - `parameters.as_of_date`
 - `parameters.seed`
 
-### 3) Run tests
+### 4) Run tests
 
 ```bash
 python -m pytest -q
 ```
 
-### 4) No-network smoke test (fixture-based)
+### 5) No-network smoke test (fixture-based)
 
 ```bash
 python -m pytest tests/test_smoke_phase1_fixture.py -q
 ```
 
-### 5) Validate required output artifacts
+### 6) Validate required output artifacts
 
 ```bash
 python scripts/check_required_outputs.py --table-dir outputs/tables --figure-dir outputs/figures --report-dir outputs/reports
@@ -216,7 +227,7 @@ python scripts/check_required_outputs.py --table-dir outputs/tables --figure-dir
 
 This fails if required tables/figures/reports are missing or empty.
 
-### 6) Launch dashboard server
+### 7) Launch dashboard server
 
 ```bash
 python -m src.dashboard.app --host 127.0.0.1 --port 8000
