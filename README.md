@@ -185,6 +185,12 @@ This runs:
 - `run_pipeline.py` with output validation (`--fail-on-missing-outputs --fail-on-empty-outputs`)
 - static dashboard generation to `outputs/reports/dashboard.html`
 
+To run pipeline + robustness + dashboard in one command:
+
+```bash
+python scripts/run_phase1.py --start 2020-01-01 --end 2024-12-31 --run-robustness
+```
+
 ### 2) Robustness sweeps (frequency/cost + start-date sensitivity)
 
 ```bash
