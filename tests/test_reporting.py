@@ -226,6 +226,45 @@ def _sample_portfolio_evaluation_summary() -> pd.DataFrame:
     )
 
 
+def _sample_robustness_scenarios() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "rebalance_frequency": ["monthly"],
+            "one_way_bps": [5.0],
+            "annualized_return": [0.12],
+            "annualized_volatility": [0.08],
+            "sharpe_ratio": [1.50],
+            "max_drawdown": [-0.10],
+            "calmar_ratio": [1.20],
+            "ending_nav": [1.30],
+            "total_turnover": [1.10],
+            "total_transaction_cost_drag": [0.004],
+        },
+        index=pd.Index(["frequency=monthly|cost_bps=5.00"], name="scenario_id"),
+    )
+
+
+def _sample_start_date_robustness() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "start_date": ["2024-01-01"],
+            "end_date": ["2024-12-31"],
+            "observations": [252],
+            "rebalance_frequency": ["quarterly"],
+            "one_way_bps": [5.0],
+            "annualized_return": [0.11],
+            "annualized_volatility": [0.09],
+            "sharpe_ratio": [1.20],
+            "max_drawdown": [-0.12],
+            "calmar_ratio": [0.95],
+            "ending_nav": [1.25],
+            "total_turnover": [1.00],
+            "total_transaction_cost_drag": [0.003],
+        },
+        index=pd.Index(["start=2024-01-01"], name="scenario_id"),
+    )
+
+
 def test_build_phase1_report_markdown_contains_key_sections() -> None:
     performance_summary = _sample_frame()
     turnover_summary = pd.DataFrame(
@@ -319,6 +358,8 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
         portfolio_score_summary=_sample_portfolio_score_summary(),
         portfolio_evaluation_summary=_sample_portfolio_evaluation_summary(),
         macro_regime_summary=_sample_macro_regime_summary(),
+        robustness_scenarios=_sample_robustness_scenarios(),
+        start_date_robustness=_sample_start_date_robustness(),
         run_configuration=_sample_run_configuration(),
         notes=["IAGG failed the liquidity filter"],
     )
@@ -345,6 +386,8 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "## Portfolio Risk Contribution" in report
     assert "## Portfolio Score Summary" in report
     assert "## Portfolio Evaluation Summary" in report
+    assert "## Robustness Scenarios" in report
+    assert "## Start-Date Robustness" in report
     assert "## Data Quality Summary" in report
     assert "## Run Configuration" in report
     assert "config\\etf_universe.yaml" in report
@@ -361,6 +404,9 @@ def test_build_phase1_report_markdown_contains_key_sections() -> None:
     assert "composite_regime" in report
     assert "75.0000" in report
     assert "0.8500" in report
+    assert "5.00" in report
+    assert "252" in report
+    assert "-12.00%" in report
 
 
 def test_build_phase1_report_html_contains_key_sections() -> None:
@@ -453,6 +499,8 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
         portfolio_score_summary=_sample_portfolio_score_summary(),
         portfolio_evaluation_summary=_sample_portfolio_evaluation_summary(),
         macro_regime_summary=_sample_macro_regime_summary(),
+        robustness_scenarios=_sample_robustness_scenarios(),
+        start_date_robustness=_sample_start_date_robustness(),
         notes=["Backtest universe mode: liquidity_filtered"],
     )
 
@@ -475,6 +523,8 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "<h2>Portfolio Risk Contribution</h2>" in report
     assert "<h2>Portfolio Score Summary</h2>" in report
     assert "<h2>Portfolio Evaluation Summary</h2>" in report
+    assert "<h2>Robustness Scenarios</h2>" in report
+    assert "<h2>Start-Date Robustness</h2>" in report
     assert "<h2>Data Quality Summary</h2>" in report
     assert "<h2>Run Configuration</h2>" in report
     assert "config\\etf_universe.yaml" in report
@@ -491,6 +541,9 @@ def test_build_phase1_report_html_contains_key_sections() -> None:
     assert "composite_regime" in report
     assert "75.0000" in report
     assert "0.8500" in report
+    assert "5.00" in report
+    assert "252" in report
+    assert "-12.00%" in report
 
 
 def test_build_rebalance_reason_summary_counts_trigger_types() -> None:

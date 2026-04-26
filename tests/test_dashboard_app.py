@@ -224,6 +224,39 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
                 },
             ]
         ).to_csv(table_dir / "macro_regime_summary.csv", index=False)
+        pd.DataFrame(
+            {
+                "rebalance_frequency": ["monthly"],
+                "one_way_bps": [5.0],
+                "annualized_return": [0.12],
+                "annualized_volatility": [0.08],
+                "sharpe_ratio": [1.50],
+                "max_drawdown": [-0.10],
+                "calmar_ratio": [1.20],
+                "ending_nav": [1.30],
+                "total_turnover": [1.10],
+                "total_transaction_cost_drag": [0.004],
+            },
+            index=pd.Index(["frequency=monthly|cost_bps=5.00"], name="scenario_id"),
+        ).to_csv(table_dir / "robustness_scenarios.csv")
+        pd.DataFrame(
+            {
+                "start_date": ["2024-01-01"],
+                "end_date": ["2024-12-31"],
+                "observations": [252],
+                "rebalance_frequency": ["quarterly"],
+                "one_way_bps": [5.0],
+                "annualized_return": [0.11],
+                "annualized_volatility": [0.09],
+                "sharpe_ratio": [1.20],
+                "max_drawdown": [-0.12],
+                "calmar_ratio": [0.95],
+                "ending_nav": [1.25],
+                "total_turnover": [1.00],
+                "total_transaction_cost_drag": [0.003],
+            },
+            index=pd.Index(["start=2024-01-01"], name="scenario_id"),
+        ).to_csv(table_dir / "start_date_robustness.csv")
         (table_dir / "pipeline_manifest.json").write_text(
             json.dumps(
                 {
@@ -264,6 +297,8 @@ def test_build_dashboard_html_contains_tables_and_figures() -> None:
         assert "Pipeline Health" in html
         assert "Latest Macro Observations" in html
         assert "Macro Regime Summary" in html
+        assert "Robustness Scenarios" in html
+        assert "Start-Date Robustness" in html
         assert "composite_regime" in html
         assert "performance_summary" in html
         assert "liquidity_filtered" in html
@@ -358,6 +393,39 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
                     "signal": ["risk_off"],
                 }
             ),
+            "robustness_scenarios": pd.DataFrame(
+                {
+                    "rebalance_frequency": ["monthly"],
+                    "one_way_bps": [5.0],
+                    "annualized_return": [0.12],
+                    "annualized_volatility": [0.08],
+                    "sharpe_ratio": [1.50],
+                    "max_drawdown": [-0.10],
+                    "calmar_ratio": [1.20],
+                    "ending_nav": [1.30],
+                    "total_turnover": [1.10],
+                    "total_transaction_cost_drag": [0.004],
+                },
+                index=pd.Index(["frequency=monthly|cost_bps=5.00"]),
+            ),
+            "start_date_robustness": pd.DataFrame(
+                {
+                    "start_date": ["2024-01-01"],
+                    "end_date": ["2024-12-31"],
+                    "observations": [252],
+                    "rebalance_frequency": ["quarterly"],
+                    "one_way_bps": [5.0],
+                    "annualized_return": [0.11],
+                    "annualized_volatility": [0.09],
+                    "sharpe_ratio": [1.20],
+                    "max_drawdown": [-0.12],
+                    "calmar_ratio": [0.95],
+                    "ending_nav": [1.25],
+                    "total_turnover": [1.00],
+                    "total_transaction_cost_drag": [0.003],
+                },
+                index=pd.Index(["start=2024-01-01"]),
+            ),
             "data_quality_summary": pd.DataFrame({"observations": [2], "missing_volume": [0]}),
             "trend_filter_summary": pd.DataFrame(
                 {
@@ -443,6 +511,10 @@ def test_format_dashboard_tables_humanizes_numeric_fields() -> None:
     assert tables["pipeline_health_summary"].loc["health", "risk_limit_breach_count"] == "1"
     assert tables["macro_regime_summary"].iloc[0]["latest_value"] == "2.0000"
     assert tables["macro_regime_summary"].iloc[0]["reference_value"] == "4.0000"
+    assert tables["robustness_scenarios"].iloc[0]["one_way_bps"] == "5.00"
+    assert tables["robustness_scenarios"].iloc[0]["annualized_return"] == "12.00%"
+    assert tables["start_date_robustness"].iloc[0]["observations"] == "252"
+    assert tables["start_date_robustness"].iloc[0]["max_drawdown"] == "-12.00%"
     assert tables["data_quality_summary"].iloc[0]["observations"] == "2"
     assert tables["trend_filter_summary"].iloc[0]["trend_active_ratio"] == "66.67%"
     assert tables["trend_filter_summary"].iloc[0]["max_reduced_assets"] == "1"

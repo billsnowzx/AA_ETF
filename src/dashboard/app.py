@@ -284,6 +284,32 @@ def _format_dashboard_tables(tables: dict[str, pd.DataFrame]) -> dict[str, pd.Da
             if column in frame.columns:
                 frame[column] = frame[column].map(_format_decimal)
 
+    if "robustness_scenarios" in formatted:
+        frame = formatted["robustness_scenarios"]
+        for column in ["annualized_return", "annualized_volatility", "max_drawdown", "total_transaction_cost_drag"]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_percent)
+        for column in ["sharpe_ratio", "calmar_ratio", "ending_nav"]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_decimal)
+        if "total_turnover" in frame.columns:
+            frame["total_turnover"] = frame["total_turnover"].map(_format_decimal)
+        if "one_way_bps" in frame.columns:
+            frame["one_way_bps"] = frame["one_way_bps"].map(lambda value: _format_decimal(value, digits=2))
+
+    if "start_date_robustness" in formatted:
+        frame = formatted["start_date_robustness"]
+        for column in ["annualized_return", "annualized_volatility", "max_drawdown", "total_transaction_cost_drag"]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_percent)
+        for column in ["sharpe_ratio", "calmar_ratio", "ending_nav", "total_turnover"]:
+            if column in frame.columns:
+                frame[column] = frame[column].map(_format_decimal)
+        if "one_way_bps" in frame.columns:
+            frame["one_way_bps"] = frame["one_way_bps"].map(lambda value: _format_decimal(value, digits=2))
+        if "observations" in frame.columns:
+            frame["observations"] = frame["observations"].map(_format_integer)
+
     return formatted
 
 
@@ -339,6 +365,8 @@ def build_dashboard_html(
     pipeline_health_summary = _read_csv_if_exists(output_path / "pipeline_health_summary.csv")
     macro_observation_summary = _read_csv_if_exists(output_path / "macro_observation_summary.csv")
     macro_regime_summary = _read_csv_if_exists(output_path / "macro_regime_summary.csv", index_col=None)
+    robustness_scenarios = _read_csv_if_exists(output_path / "robustness_scenarios.csv")
+    start_date_robustness = _read_csv_if_exists(output_path / "start_date_robustness.csv")
     rolling_volatility = _read_csv_if_exists(output_path / "rolling_volatility.csv")
     rolling_sharpe = _read_csv_if_exists(output_path / "rolling_sharpe.csv")
     rolling_correlation = _read_csv_if_exists(output_path / "rolling_correlation.csv")
@@ -369,6 +397,8 @@ def build_dashboard_html(
             "pipeline_health_summary": pipeline_health_summary,
             "macro_observation_summary": macro_observation_summary.tail(5),
             "macro_regime_summary": macro_regime_summary,
+            "robustness_scenarios": robustness_scenarios,
+            "start_date_robustness": start_date_robustness,
             "rolling_volatility": rolling_volatility.tail(5),
             "rolling_sharpe": rolling_sharpe.tail(5),
             "rolling_correlation": rolling_correlation.tail(5),
@@ -399,6 +429,8 @@ def build_dashboard_html(
     pipeline_health_summary = formatted_tables["pipeline_health_summary"]
     macro_observation_summary = formatted_tables["macro_observation_summary"]
     macro_regime_summary = formatted_tables["macro_regime_summary"]
+    robustness_scenarios = formatted_tables["robustness_scenarios"]
+    start_date_robustness = formatted_tables["start_date_robustness"]
     rolling_volatility = formatted_tables["rolling_volatility"]
     rolling_sharpe = formatted_tables["rolling_sharpe"]
     rolling_correlation = formatted_tables["rolling_correlation"]
@@ -544,6 +576,14 @@ def build_dashboard_html(
       <section class="card">
         <h2>Macro Regime Summary</h2>
         {dataframe_to_html_table(macro_regime_summary)}
+      </section>
+      <section class="card">
+        <h2>Robustness Scenarios</h2>
+        {dataframe_to_html_table(robustness_scenarios)}
+      </section>
+      <section class="card">
+        <h2>Start-Date Robustness</h2>
+        {dataframe_to_html_table(start_date_robustness)}
       </section>
       <section class="card">
         <h2>Performance Summary</h2>

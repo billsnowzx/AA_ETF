@@ -379,6 +379,34 @@ def _format_macro_regime_summary(macro_regime_summary: pd.DataFrame | None) -> p
     return formatted
 
 
+def _format_robustness_scenarios(robustness_scenarios: pd.DataFrame | None) -> pd.DataFrame:
+    """Format robustness scenario rows for report presentation."""
+    if robustness_scenarios is None or robustness_scenarios.empty:
+        return pd.DataFrame()
+
+    formatted = robustness_scenarios.astype(object).copy()
+    for column in ["annualized_return", "annualized_volatility", "max_drawdown", "total_transaction_cost_drag"]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(_format_percent)
+    for column in ["sharpe_ratio", "calmar_ratio", "ending_nav", "total_turnover"]:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(_format_decimal)
+    if "one_way_bps" in formatted.columns:
+        formatted["one_way_bps"] = formatted["one_way_bps"].map(lambda value: _format_decimal(value, digits=2))
+    return formatted
+
+
+def _format_start_date_robustness(start_date_robustness: pd.DataFrame | None) -> pd.DataFrame:
+    """Format start-date robustness rows for report presentation."""
+    if start_date_robustness is None or start_date_robustness.empty:
+        return pd.DataFrame()
+
+    formatted = _format_robustness_scenarios(start_date_robustness)
+    if "observations" in formatted.columns:
+        formatted["observations"] = formatted["observations"].map(lambda value: _format_decimal(value, digits=0))
+    return formatted
+
+
 def _format_risk_switch_summary(risk_switch_summary: pd.DataFrame | None) -> pd.DataFrame:
     """Format risk-switch summary diagnostics for report presentation."""
     if risk_switch_summary is None or risk_switch_summary.empty:
@@ -451,6 +479,8 @@ def build_phase1_report_markdown(
     portfolio_score_summary: pd.DataFrame | None = None,
     portfolio_evaluation_summary: pd.DataFrame | None = None,
     macro_regime_summary: pd.DataFrame | None = None,
+    robustness_scenarios: pd.DataFrame | None = None,
+    start_date_robustness: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
     """Build a concise Markdown report from Phase 1 pipeline outputs."""
@@ -535,6 +565,8 @@ def build_phase1_report_markdown(
     portfolio_score_view = _format_portfolio_score_summary(portfolio_score_summary)
     portfolio_evaluation_view = _format_portfolio_evaluation_summary(portfolio_evaluation_summary)
     macro_regime_view = _format_macro_regime_summary(macro_regime_summary)
+    robustness_scenarios_view = _format_robustness_scenarios(robustness_scenarios)
+    start_date_robustness_view = _format_start_date_robustness(start_date_robustness)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     risk_switch_view = _format_risk_switch_summary(risk_switch_summary)
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
@@ -644,6 +676,14 @@ Generated: {report_date}
 
 {dataframe_to_markdown_table(portfolio_evaluation_view) if not portfolio_evaluation_view.empty else "No portfolio evaluation summary generated."}
 
+## Robustness Scenarios
+
+{dataframe_to_markdown_table(robustness_scenarios_view) if not robustness_scenarios_view.empty else "No robustness scenario output generated."}
+
+## Start-Date Robustness
+
+{dataframe_to_markdown_table(start_date_robustness_view) if not start_date_robustness_view.empty else "No start-date robustness output generated."}
+
 ## ETF Summary
 
 {dataframe_to_markdown_table(etf_view)}
@@ -697,6 +737,8 @@ def build_phase1_report_html(
     portfolio_score_summary: pd.DataFrame | None = None,
     portfolio_evaluation_summary: pd.DataFrame | None = None,
     macro_regime_summary: pd.DataFrame | None = None,
+    robustness_scenarios: pd.DataFrame | None = None,
+    start_date_robustness: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> str:
     """Build a shareable HTML report from Phase 1 pipeline outputs."""
@@ -781,6 +823,8 @@ def build_phase1_report_html(
     portfolio_score_view = _format_portfolio_score_summary(portfolio_score_summary)
     portfolio_evaluation_view = _format_portfolio_evaluation_summary(portfolio_evaluation_summary)
     macro_regime_view = _format_macro_regime_summary(macro_regime_summary)
+    robustness_scenarios_view = _format_robustness_scenarios(robustness_scenarios)
+    start_date_robustness_view = _format_start_date_robustness(start_date_robustness)
     trend_view = trend_filter_summary if trend_filter_summary is not None else pd.DataFrame()
     risk_switch_view = _format_risk_switch_summary(risk_switch_summary)
     run_config_view = run_configuration if run_configuration is not None else pd.DataFrame()
@@ -850,6 +894,8 @@ def build_phase1_report_html(
   <section><h2>Portfolio Risk Contribution</h2>{dataframe_to_html_table(portfolio_risk_contribution_view) if not portfolio_risk_contribution_view.empty else "<p>No portfolio risk contribution generated.</p>"}</section>
   <section><h2>Portfolio Score Summary</h2>{dataframe_to_html_table(portfolio_score_view) if not portfolio_score_view.empty else "<p>No portfolio score summary generated.</p>"}</section>
   <section><h2>Portfolio Evaluation Summary</h2>{dataframe_to_html_table(portfolio_evaluation_view) if not portfolio_evaluation_view.empty else "<p>No portfolio evaluation summary generated.</p>"}</section>
+  <section><h2>Robustness Scenarios</h2>{dataframe_to_html_table(robustness_scenarios_view) if not robustness_scenarios_view.empty else "<p>No robustness scenario output generated.</p>"}</section>
+  <section><h2>Start-Date Robustness</h2>{dataframe_to_html_table(start_date_robustness_view) if not start_date_robustness_view.empty else "<p>No start-date robustness output generated.</p>"}</section>
   <section><h2>ETF Summary</h2>{dataframe_to_html_table(etf_view)}</section>
   <section><h2>Data Quality Summary</h2>{dataframe_to_html_table(data_quality_view) if not data_quality_view.empty else "<p>No data quality summary generated.</p>"}</section>
   <section><h2>Correlation Highlights</h2>{dataframe_to_html_table(correlation_summary) if not correlation_summary.empty else "<p>No non-diagonal correlation pairs available.</p>"}</section>
@@ -891,6 +937,8 @@ def write_phase1_report(
     portfolio_score_summary: pd.DataFrame | None = None,
     portfolio_evaluation_summary: pd.DataFrame | None = None,
     macro_regime_summary: pd.DataFrame | None = None,
+    robustness_scenarios: pd.DataFrame | None = None,
+    start_date_robustness: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
     """Write the Phase 1 Markdown report to disk."""
@@ -925,6 +973,8 @@ def write_phase1_report(
         portfolio_score_summary=portfolio_score_summary,
         portfolio_evaluation_summary=portfolio_evaluation_summary,
         macro_regime_summary=macro_regime_summary,
+        robustness_scenarios=robustness_scenarios,
+        start_date_robustness=start_date_robustness,
         run_configuration=run_configuration,
         notes=notes,
     )
@@ -963,6 +1013,8 @@ def write_phase1_html_report(
     portfolio_score_summary: pd.DataFrame | None = None,
     portfolio_evaluation_summary: pd.DataFrame | None = None,
     macro_regime_summary: pd.DataFrame | None = None,
+    robustness_scenarios: pd.DataFrame | None = None,
+    start_date_robustness: pd.DataFrame | None = None,
     notes: list[str] | None = None,
 ) -> Path:
     """Write the Phase 1 HTML report to disk."""
@@ -997,6 +1049,8 @@ def write_phase1_html_report(
         portfolio_score_summary=portfolio_score_summary,
         portfolio_evaluation_summary=portfolio_evaluation_summary,
         macro_regime_summary=macro_regime_summary,
+        robustness_scenarios=robustness_scenarios,
+        start_date_robustness=start_date_robustness,
         run_configuration=run_configuration,
         notes=notes,
     )
