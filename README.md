@@ -188,13 +188,16 @@ This runs:
 ### 2) Robustness sweeps (frequency/cost + start-date sensitivity)
 
 ```bash
-python scripts/run_robustness.py --start 2020-01-01 --end 2024-12-31
+python scripts/run_robustness.py --start 2020-01-01 --end 2024-12-31 --fail-on-missing-outputs --fail-on-empty-outputs
 ```
 
 This writes:
 
 - `outputs/tables/robustness_scenarios.csv`
 - `outputs/tables/start_date_robustness.csv`
+- `outputs/tables/robustness_manifest.json`
+- `outputs/tables/robustness_output_inventory.csv`
+- `outputs/tables/robustness_quality_summary.csv`
 
 ### 3) Deterministic run metadata
 

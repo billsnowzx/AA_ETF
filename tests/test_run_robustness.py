@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 
 from scripts.run_robustness import (
+    build_robustness_output_inventory,
+    build_robustness_quality_summary,
     build_default_stress_start_dates,
     parse_csv_floats,
     parse_csv_strings,
@@ -82,10 +84,56 @@ def test_run_robustness_workflow_writes_scenario_outputs(monkeypatch) -> None:
 
         assert paths["robustness_scenarios"].exists()
         assert paths["start_date_robustness"].exists()
+        assert paths["robustness_manifest"].exists()
+        assert paths["robustness_output_inventory"].exists()
+        assert paths["robustness_quality_summary"].exists()
 
         scenarios = pd.read_csv(paths["robustness_scenarios"], index_col=0)
         stress = pd.read_csv(paths["start_date_robustness"], index_col=0)
+        inventory = pd.read_csv(paths["robustness_output_inventory"])
+        quality = pd.read_csv(paths["robustness_quality_summary"], index_col=0)
         assert "ending_nav" in scenarios.columns
         assert "start_date" in stress.columns
+        assert set(["robustness_scenarios", "start_date_robustness", "robustness_manifest"]).issubset(
+            set(inventory["name"].tolist())
+        )
+        assert bool(quality.loc["robustness", "run_passed_quality_gates"]) is True
+    finally:
+        shutil.rmtree(output_root, ignore_errors=True)
+
+
+def test_build_robustness_quality_summary_flags_missing_and_empty_rows() -> None:
+    inventory = pd.DataFrame(
+        [
+            {"name": "robustness_scenarios", "path": "a.csv", "exists": True, "size_bytes": 10},
+            {"name": "start_date_robustness", "path": "b.csv", "exists": False, "size_bytes": 0},
+            {"name": "robustness_manifest", "path": "c.json", "exists": True, "size_bytes": 0},
+        ]
+    )
+
+    summary = build_robustness_quality_summary(inventory)
+
+    assert int(summary.loc["robustness", "missing_output_count"]) == 1
+    assert int(summary.loc["robustness", "empty_output_count"]) == 1
+    assert bool(summary.loc["robustness", "run_passed_quality_gates"]) is False
+
+
+def test_build_robustness_output_inventory_records_exists_and_size() -> None:
+    output_root = Path("data/cache") / f"test_robustness_inventory_{uuid.uuid4().hex}"
+    output_root.mkdir(parents=True, exist_ok=True)
+    existing_path = output_root / "existing.csv"
+    missing_path = output_root / "missing.csv"
+    existing_path.write_text("x\n1\n", encoding="utf-8")
+    try:
+        inventory = build_robustness_output_inventory(
+            {"existing": existing_path, "missing": missing_path}
+        )
+        existing_row = inventory.loc[inventory["name"] == "existing"].iloc[0]
+        missing_row = inventory.loc[inventory["name"] == "missing"].iloc[0]
+
+        assert bool(existing_row["exists"]) is True
+        assert int(existing_row["size_bytes"]) > 0
+        assert bool(missing_row["exists"]) is False
+        assert int(missing_row["size_bytes"]) == 0
     finally:
         shutil.rmtree(output_root, ignore_errors=True)
