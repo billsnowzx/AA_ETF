@@ -241,6 +241,7 @@ import pandas as pd
 from src.data.fetch_prices import fetch_prices
 from src.data.clean_data import batch_clean_price_frames
 from src.backtest.scenarios import run_robustness_scenarios
+from src.backtest.stress_test import run_start_date_robustness
 from src.portfolio.weights import load_portfolio_template
 from src.universe.liquidity_filter import filter_liquid_universe
 
@@ -264,6 +265,15 @@ scenario_table = run_robustness_scenarios(
     target_weights=balanced_weights,
     rebalance_frequencies=["monthly", "quarterly"],
     one_way_bps_values=[0.0, 5.0, 10.0],
+)
+
+# Optional start-date sensitivity sweep
+start_date_table = run_start_date_robustness(
+    asset_returns=asset_returns,
+    target_weights=balanced_weights,
+    start_dates=["2020-01-01", "2021-01-01", "2022-01-01"],
+    rebalance_frequency="quarterly",
+    one_way_bps=5.0,
 )
 ```
 
