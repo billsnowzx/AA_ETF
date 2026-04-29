@@ -4,6 +4,7 @@ import pandas as pd
 
 from src.universe.etf_scoring import (
     PHASE1_MAX_SCORE,
+    load_etf_scoring_rules,
     score_data_quality_component,
     score_etf_universe,
     score_liquidity_component,
@@ -105,3 +106,10 @@ def test_score_etf_universe_uses_metadata_summary_when_provided() -> None:
     scored = score_etf_universe("config/etf_universe.yaml", liquidity_summary, metadata_summary=metadata_summary)
 
     assert scored.loc["VTI", "strategy_fit_score"] > scored.loc["VNQ", "strategy_fit_score"]
+
+
+def test_etf_scoring_rules_can_be_loaded_from_config() -> None:
+    rules = load_etf_scoring_rules("config/scoring_rules.yaml")
+
+    assert rules["liquidity"]["adv_threshold"] == 50_000_000.0
+    assert rules["strategy_fit"]["full_credit_total_assets"] == 1_000_000_000.0

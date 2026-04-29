@@ -16,6 +16,7 @@ def test_argument_parser_exposes_robustness_options() -> None:
     args = parser.parse_args(["--run-robustness"])
 
     assert args.run_robustness is True
+    assert args.reuse_raw_data is False
     assert args.robustness_rebalance_frequencies == "monthly,quarterly"
     assert args.robustness_one_way_bps_values == "0,5,10"
     assert args.robustness_stress_start_dates == ""
@@ -42,6 +43,7 @@ def test_build_command_helpers_include_expected_flags() -> None:
             "0,5",
             "--robustness-stress-start-dates",
             "2020-01-01,2020-07-01",
+            "--reuse-raw-data",
         ]
     )
     repo_root = Path("D:/AI/AAETF")
@@ -55,10 +57,12 @@ def test_build_command_helpers_include_expected_flags() -> None:
     assert str(repo_root / "run_pipeline.py") in pipeline_cmd
     assert "--fail-on-missing-outputs" in pipeline_cmd
     assert "--seed" in pipeline_cmd and "7" in pipeline_cmd
+    assert "--reuse-raw-data" in pipeline_cmd
 
     assert str(repo_root / "scripts" / "run_robustness.py") in robustness_cmd
     assert "--stress-start-dates" in robustness_cmd
     assert "--fail-on-empty-outputs" in robustness_cmd
+    assert "--reuse-raw-data" in robustness_cmd
 
     assert dashboard_cmd[:3] == ["python", "-m", "src.dashboard.app"]
     assert "--dashboard-path" in dashboard_cmd
@@ -106,8 +110,8 @@ def test_main_runs_robustness_when_enabled(monkeypatch) -> None:
 
     main()
 
-    assert len(calls) == 4
+    assert len(calls) == 3
     assert "run_pipeline.py" in calls[0][1]
     assert "run_robustness.py" in calls[1][1]
     assert "--open" in calls[2]
-    assert "--host" in calls[3] and "--port" in calls[3]
+    assert "--no-server" not in calls[2]

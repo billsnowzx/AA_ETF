@@ -2,7 +2,88 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
+
 import pandas as pd
+
+from src.utils.config import load_yaml_file
+
+DEFAULT_PORTFOLIO_SCORING_RULES: dict[str, dict[str, float]] = {
+    "return_score": {
+        "max_score": 25.0,
+        "annualized_return_lower": -0.05,
+        "annualized_return_upper": 0.12,
+    },
+    "risk_control_score": {
+        "max_score": 25.0,
+        "annualized_volatility_lower": 0.08,
+        "annualized_volatility_upper": 0.25,
+        "max_drawdown_lower": 0.10,
+        "max_drawdown_upper": 0.40,
+        "volatility_weight": 0.50,
+        "drawdown_weight": 0.50,
+    },
+    "risk_adjusted_score": {
+        "max_score": 20.0,
+        "sharpe_lower": 0.0,
+        "sharpe_upper": 1.5,
+        "sortino_lower": 0.0,
+        "sortino_upper": 2.0,
+        "calmar_lower": 0.0,
+        "calmar_upper": 1.0,
+        "sharpe_weight": 0.50,
+        "sortino_weight": 0.30,
+        "calmar_weight": 0.20,
+    },
+    "stability_score": {
+        "max_score": 15.0,
+        "monthly_win_weight": 0.40,
+        "annual_win_weight": 0.30,
+        "sharpe_stability_weight": 0.30,
+    },
+    "executability_score": {
+        "max_score": 15.0,
+        "average_turnover_lower": 0.02,
+        "average_turnover_upper": 0.20,
+        "transaction_cost_drag_lower": 0.002,
+        "transaction_cost_drag_upper": 0.020,
+        "turnover_weight": 0.60,
+        "transaction_cost_weight": 0.40,
+    },
+}
+
+
+def load_portfolio_scoring_rules(config_path: str | Path = "config/scoring_rules.yaml") -> dict[str, dict[str, float]]:
+    """Load portfolio scoring thresholds from YAML with defaults filled in."""
+    config = load_yaml_file(config_path)
+    rules = deepcopy(DEFAULT_PORTFOLIO_SCORING_RULES)
+    configured = config.get("portfolio_scoring", {})
+    if not isinstance(configured, dict):
+        raise ValueError(f"{config_path}: portfolio_scoring must be a mapping.")
+    for section, values in configured.items():
+        if section not in rules:
+            raise ValueError(f"{config_path}: unsupported portfolio_scoring section '{section}'.")
+        if not isinstance(values, dict):
+            raise ValueError(f"{config_path}: portfolio_scoring.{section} must be a mapping.")
+        for key, value in values.items():
+            if key not in rules[section]:
+                raise ValueError(f"{config_path}: unsupported portfolio_scoring.{section}.{key}.")
+            rules[section][key] = float(value)
+    return rules
+
+
+def _portfolio_scoring_rules(scoring_rules: dict[str, Any] | None) -> dict[str, dict[str, float]]:
+    rules = deepcopy(DEFAULT_PORTFOLIO_SCORING_RULES)
+    if scoring_rules is None:
+        return rules
+    for section, values in scoring_rules.items():
+        if section in rules and isinstance(values, dict):
+            for key, value in values.items():
+                if key in rules[section]:
+                    rules[section][key] = float(value)
+    return rules
 
 
 def _clip_unit(value: float) -> float:
@@ -56,8 +137,10 @@ def build_portfolio_score_summary(
     turnover_summary: pd.DataFrame,
     return_table: pd.DataFrame,
     rolling_sharpe_table: pd.DataFrame | None = None,
+    scoring_rules: dict[str, Any] | None = None,
 ) -> pd.DataFrame:
     """Build a component-based portfolio score summary (0-100)."""
+    rules = _portfolio_scoring_rules(scoring_rules)
     def _get_float(frame: pd.DataFrame, row: str, column: str, default: float = 0.0) -> float:
         if column not in frame.columns:
             return float(default)
@@ -79,15 +162,50 @@ def build_portfolio_score_summary(
         total_cost_drag = _get_float(turnover_summary, portfolio, "total_transaction_cost_drag", default=0.0)
         returns = pd.to_numeric(return_table[portfolio], errors="coerce").dropna()
 
-        return_score = 25.0 * _linear_score(ann_return, lower=-0.05, upper=0.12)
-        vol_quality = _inverse_linear_score(ann_vol, lower=0.08, upper=0.25)
-        drawdown_quality = _inverse_linear_score(max_drawdown, lower=0.10, upper=0.40)
-        risk_control_score = 25.0 * (0.5 * vol_quality + 0.5 * drawdown_quality)
+        return_rules = rules["return_score"]
+        return_score = return_rules["max_score"] * _linear_score(
+            ann_return,
+            lower=return_rules["annualized_return_lower"],
+            upper=return_rules["annualized_return_upper"],
+        )
 
-        sharpe_quality = _linear_score(sharpe, lower=0.0, upper=1.5)
-        sortino_quality = _linear_score(sortino, lower=0.0, upper=2.0)
-        calmar_quality = _linear_score(calmar, lower=0.0, upper=1.0)
-        risk_adjusted_score = 20.0 * (0.5 * sharpe_quality + 0.3 * sortino_quality + 0.2 * calmar_quality)
+        risk_rules = rules["risk_control_score"]
+        vol_quality = _inverse_linear_score(
+            ann_vol,
+            lower=risk_rules["annualized_volatility_lower"],
+            upper=risk_rules["annualized_volatility_upper"],
+        )
+        drawdown_quality = _inverse_linear_score(
+            max_drawdown,
+            lower=risk_rules["max_drawdown_lower"],
+            upper=risk_rules["max_drawdown_upper"],
+        )
+        risk_control_score = risk_rules["max_score"] * (
+            risk_rules["volatility_weight"] * vol_quality
+            + risk_rules["drawdown_weight"] * drawdown_quality
+        )
+
+        risk_adjusted_rules = rules["risk_adjusted_score"]
+        sharpe_quality = _linear_score(
+            sharpe,
+            lower=risk_adjusted_rules["sharpe_lower"],
+            upper=risk_adjusted_rules["sharpe_upper"],
+        )
+        sortino_quality = _linear_score(
+            sortino,
+            lower=risk_adjusted_rules["sortino_lower"],
+            upper=risk_adjusted_rules["sortino_upper"],
+        )
+        calmar_quality = _linear_score(
+            calmar,
+            lower=risk_adjusted_rules["calmar_lower"],
+            upper=risk_adjusted_rules["calmar_upper"],
+        )
+        risk_adjusted_score = risk_adjusted_rules["max_score"] * (
+            risk_adjusted_rules["sharpe_weight"] * sharpe_quality
+            + risk_adjusted_rules["sortino_weight"] * sortino_quality
+            + risk_adjusted_rules["calmar_weight"] * calmar_quality
+        )
 
         month_win = monthly_win_rate(returns)
         year_win = annual_win_rate(returns)
@@ -97,11 +215,28 @@ def build_portfolio_score_summary(
             else pd.Series(dtype=float)
         )
         sharpe_stability = rolling_sharpe_stability_score(rolling_series)
-        stability_score = 15.0 * (0.4 * month_win + 0.3 * year_win + 0.3 * sharpe_stability)
+        stability_rules = rules["stability_score"]
+        stability_score = stability_rules["max_score"] * (
+            stability_rules["monthly_win_weight"] * month_win
+            + stability_rules["annual_win_weight"] * year_win
+            + stability_rules["sharpe_stability_weight"] * sharpe_stability
+        )
 
-        turnover_quality = _inverse_linear_score(avg_turnover, lower=0.02, upper=0.20)
-        cost_quality = _inverse_linear_score(total_cost_drag, lower=0.002, upper=0.02)
-        executability_score = 15.0 * (0.6 * turnover_quality + 0.4 * cost_quality)
+        executability_rules = rules["executability_score"]
+        turnover_quality = _inverse_linear_score(
+            avg_turnover,
+            lower=executability_rules["average_turnover_lower"],
+            upper=executability_rules["average_turnover_upper"],
+        )
+        cost_quality = _inverse_linear_score(
+            total_cost_drag,
+            lower=executability_rules["transaction_cost_drag_lower"],
+            upper=executability_rules["transaction_cost_drag_upper"],
+        )
+        executability_score = executability_rules["max_score"] * (
+            executability_rules["turnover_weight"] * turnover_quality
+            + executability_rules["transaction_cost_weight"] * cost_quality
+        )
 
         total_score = (
             return_score
@@ -110,6 +245,7 @@ def build_portfolio_score_summary(
             + stability_score
             + executability_score
         )
+        max_total_score = sum(float(section["max_score"]) for section in rules.values())
         rows.append(
             {
                 "portfolio": portfolio,
@@ -119,7 +255,7 @@ def build_portfolio_score_summary(
                 "stability_score": stability_score,
                 "executability_score": executability_score,
                 "total_score": total_score,
-                "score_pct": total_score / 100.0,
+                "score_pct": total_score / max_total_score if max_total_score > 0 else 0.0,
                 "monthly_win_rate": month_win,
                 "annual_win_rate": year_win,
                 "avg_turnover": avg_turnover,

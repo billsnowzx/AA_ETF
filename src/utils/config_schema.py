@@ -167,6 +167,11 @@ def validate_rebalance_schema(config: dict[str, Any], config_path: str | Path) -
             raise ValueError(f"{config_path}: risk_switch.destination_assets must be a list.")
         for idx, asset in enumerate(destination_assets):
             _require_string(asset, f"{config_path}: risk_switch.destination_assets[{idx}]")
+        risk_assets = risk_switch_mapping.get("risk_assets", [])
+        if not isinstance(risk_assets, list):
+            raise ValueError(f"{config_path}: risk_switch.risk_assets must be a list.")
+        for idx, asset in enumerate(risk_assets):
+            _require_string(asset, f"{config_path}: risk_switch.risk_assets[{idx}]")
         threshold = risk_switch_mapping.get("annualized_volatility_threshold")
         if threshold is not None:
             numeric_threshold = _require_non_negative_number(
@@ -214,6 +219,90 @@ def validate_risk_limits_schema(config: dict[str, Any], config_path: str | Path)
         raise ValueError(f"{config_path}: risk_limits.liquidity.recent_liquidity_pass_ratio must be <= 1.0.")
 
 
+def validate_scoring_rules_schema(config: dict[str, Any], config_path: str | Path) -> None:
+    """Validate scoring-rules YAML shape and numeric thresholds."""
+    for section_name in ["portfolio_scoring", "etf_scoring"]:
+        section = config.get(section_name)
+        if section is None:
+            continue
+        section_mapping = _require_mapping(section, f"{config_path}: {section_name}")
+        for group_name, group in section_mapping.items():
+            group_mapping = _require_mapping(group, f"{config_path}: {section_name}.{group_name}")
+            for key, value in group_mapping.items():
+                if key.endswith("_lower") or key.endswith("_upper") or key.endswith("_threshold"):
+                    if not isinstance(value, (int, float)):
+                        raise ValueError(f"{config_path}: {section_name}.{group_name}.{key} must be numeric.")
+                else:
+                    _require_non_negative_number(value, f"{config_path}: {section_name}.{group_name}.{key}")
+
+
+def _enabled_universe_tickers(universe_config: dict[str, Any]) -> set[str]:
+    tickers = _require_mapping(universe_config.get("tickers"), "universe: tickers")
+    return {
+        str(ticker)
+        for ticker, metadata in tickers.items()
+        if isinstance(metadata, dict) and metadata.get("enabled") is True
+    }
+
+
+def _unknown_weight_tickers(weights: dict[str, Any], enabled_tickers: set[str]) -> list[str]:
+    return sorted(str(ticker) for ticker in weights if str(ticker) not in enabled_tickers)
+
+
+def validate_phase1_config_consistency(
+    *,
+    universe_config: dict[str, Any],
+    portfolio_config: dict[str, Any],
+    benchmark_config: dict[str, Any],
+    rebalance_config: dict[str, Any],
+) -> None:
+    """Validate cross-file references between Phase 1 config files."""
+    enabled_tickers = _enabled_universe_tickers(universe_config)
+    errors: list[str] = []
+
+    templates = _require_mapping(portfolio_config.get("templates"), "portfolio_templates: templates")
+    for template_name, template_data in templates.items():
+        weights = _require_mapping(
+            _require_mapping(template_data, f"portfolio_templates: templates.{template_name}").get("weights"),
+            f"portfolio_templates: templates.{template_name}.weights",
+        )
+        unknown = _unknown_weight_tickers(weights, enabled_tickers)
+        if unknown:
+            errors.append(
+                f"portfolio_templates: templates.{template_name}.weights contains tickers not enabled in universe: {unknown}"
+            )
+
+    benchmarks = _require_mapping(benchmark_config.get("benchmarks"), "benchmark_config: benchmarks")
+    for benchmark_name, benchmark_data in benchmarks.items():
+        weights = _require_mapping(
+            _require_mapping(benchmark_data, f"benchmark_config: benchmarks.{benchmark_name}").get("weights"),
+            f"benchmark_config: benchmarks.{benchmark_name}.weights",
+        )
+        unknown = _unknown_weight_tickers(weights, enabled_tickers)
+        if unknown:
+            errors.append(
+                f"benchmark_config: benchmarks.{benchmark_name}.weights contains tickers not enabled in universe: {unknown}"
+            )
+
+    risk_switch = rebalance_config.get("risk_switch")
+    if risk_switch is not None:
+        risk_switch_mapping = _require_mapping(risk_switch, "rebalance_rules: risk_switch")
+        for field_name in ["destination_assets", "risk_assets"]:
+            assets = risk_switch_mapping.get(field_name, [])
+            if assets is None:
+                continue
+            if not isinstance(assets, list):
+                continue
+            unknown = sorted(str(asset) for asset in assets if str(asset) not in enabled_tickers)
+            if unknown:
+                errors.append(
+                    f"rebalance_rules: risk_switch.{field_name} contains tickers not enabled in universe: {unknown}"
+                )
+
+    if errors:
+        raise ValueError("Config consistency validation failed:\n- " + "\n- ".join(errors))
+
+
 def validate_phase1_config_files(
     *,
     universe_config_path: str | Path,
@@ -221,6 +310,7 @@ def validate_phase1_config_files(
     benchmark_config_path: str | Path,
     rebalance_config_path: str | Path,
     risk_limits_config_path: str | Path,
+    scoring_config_path: str | Path | None = None,
 ) -> None:
     """Validate all Phase 1 config files and raise one aggregated error if invalid."""
     config_paths = {
@@ -230,6 +320,8 @@ def validate_phase1_config_files(
         "rebalance_rules": Path(rebalance_config_path),
         "risk_limits": Path(risk_limits_config_path),
     }
+    if scoring_config_path is not None:
+        config_paths["scoring_rules"] = Path(scoring_config_path)
     errors: list[str] = []
 
     for name, path in config_paths.items():
@@ -246,13 +338,28 @@ def validate_phase1_config_files(
         ("rebalance_rules", validate_rebalance_schema),
         ("risk_limits", validate_risk_limits_schema),
     ]
+    if scoring_config_path is not None:
+        validators.append(("scoring_rules", validate_scoring_rules_schema))
 
+    loaded_configs: dict[str, dict[str, Any]] = {}
     for name, validator in validators:
         path = config_paths[name]
         try:
             config = load_yaml_file(path)
+            loaded_configs[name] = config
             validator(config, path)
         except Exception as exc:  # pragma: no cover - exercised via tests
+            errors.append(str(exc))
+
+    if not errors:
+        try:
+            validate_phase1_config_consistency(
+                universe_config=loaded_configs["universe"],
+                portfolio_config=loaded_configs["portfolio_templates"],
+                benchmark_config=loaded_configs["benchmarks"],
+                rebalance_config=loaded_configs["rebalance_rules"],
+            )
+        except Exception as exc:
             errors.append(str(exc))
 
     if errors:

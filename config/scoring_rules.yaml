@@ -1,0 +1,59 @@
+portfolio_scoring:
+  return_score:
+    max_score: 25.0
+    annualized_return_lower: -0.05
+    annualized_return_upper: 0.12
+  risk_control_score:
+    max_score: 25.0
+    annualized_volatility_lower: 0.08
+    annualized_volatility_upper: 0.25
+    max_drawdown_lower: 0.10
+    max_drawdown_upper: 0.40
+    volatility_weight: 0.50
+    drawdown_weight: 0.50
+  risk_adjusted_score:
+    max_score: 20.0
+    sharpe_lower: 0.0
+    sharpe_upper: 1.5
+    sortino_lower: 0.0
+    sortino_upper: 2.0
+    calmar_lower: 0.0
+    calmar_upper: 1.0
+    sharpe_weight: 0.50
+    sortino_weight: 0.30
+    calmar_weight: 0.20
+  stability_score:
+    max_score: 15.0
+    monthly_win_weight: 0.40
+    annual_win_weight: 0.30
+    sharpe_stability_weight: 0.30
+  executability_score:
+    max_score: 15.0
+    average_turnover_lower: 0.02
+    average_turnover_upper: 0.20
+    transaction_cost_drag_lower: 0.002
+    transaction_cost_drag_upper: 0.020
+    turnover_weight: 0.60
+    transaction_cost_weight: 0.40
+
+etf_scoring:
+  liquidity:
+    max_score: 25.0
+    adv_threshold: 50000000.0
+    average_adv_weight: 0.50
+    recent_pass_ratio_weight: 0.50
+  data_quality:
+    max_score: 10.0
+    target_observations: 252
+    observation_weight: 0.50
+    sufficient_history_weight: 0.50
+  strategy_fit:
+    max_score: 5.0
+    asset_class_weight: 0.30
+    description_weight: 0.20
+    metadata_available_weight: 0.20
+    expense_ratio_weight: 0.20
+    total_assets_weight: 0.10
+    full_credit_expense_ratio: 0.0025
+    zero_credit_expense_ratio: 0.0100
+    full_credit_total_assets: 1000000000.0

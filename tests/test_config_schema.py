@@ -62,6 +62,24 @@ def _valid_risk_limits() -> dict:
     }
 
 
+def _valid_scoring_rules() -> dict:
+    return {
+        "portfolio_scoring": {
+            "return_score": {
+                "max_score": 25.0,
+                "annualized_return_lower": -0.05,
+                "annualized_return_upper": 0.12,
+            }
+        },
+        "etf_scoring": {
+            "liquidity": {
+                "max_score": 25.0,
+                "adv_threshold": 50_000_000,
+            }
+        },
+    }
+
+
 def test_validate_phase1_config_files_accepts_valid_files() -> None:
     root = Path("data/cache") / f"config_schema_valid_{uuid.uuid4().hex}"
     root.mkdir(parents=True, exist_ok=True)
@@ -70,6 +88,7 @@ def test_validate_phase1_config_files_accepts_valid_files() -> None:
     benchmarks = root / "benchmark_config.yaml"
     rebalance = root / "rebalance_rules.yaml"
     risk_limits = root / "risk_limits.yaml"
+    scoring = root / "scoring_rules.yaml"
 
     try:
         _write_yaml(universe, _valid_universe())
@@ -77,6 +96,7 @@ def test_validate_phase1_config_files_accepts_valid_files() -> None:
         _write_yaml(benchmarks, _valid_benchmarks())
         _write_yaml(rebalance, _valid_rebalance())
         _write_yaml(risk_limits, _valid_risk_limits())
+        _write_yaml(scoring, _valid_scoring_rules())
 
         validate_phase1_config_files(
             universe_config_path=universe,
@@ -84,6 +104,7 @@ def test_validate_phase1_config_files_accepts_valid_files() -> None:
             benchmark_config_path=benchmarks,
             rebalance_config_path=rebalance,
             risk_limits_config_path=risk_limits,
+            scoring_config_path=scoring,
         )
     finally:
         shutil.rmtree(root, ignore_errors=True)
@@ -142,6 +163,74 @@ def test_validate_phase1_config_files_raises_for_invalid_risk_limits_schema() ->
         _write_yaml(risk_limits, invalid_risk_limits)
 
         with pytest.raises(ValueError, match="recent_liquidity_pass_ratio"):
+            validate_phase1_config_files(
+                universe_config_path=universe,
+                portfolio_config_path=templates,
+                benchmark_config_path=benchmarks,
+                rebalance_config_path=rebalance,
+                risk_limits_config_path=risk_limits,
+            )
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_validate_phase1_config_files_raises_for_unknown_portfolio_ticker() -> None:
+    root = Path("data/cache") / f"config_schema_unknown_ticker_{uuid.uuid4().hex}"
+    root.mkdir(parents=True, exist_ok=True)
+    universe = root / "etf_universe.yaml"
+    templates = root / "portfolio_templates.yaml"
+    benchmarks = root / "benchmark_config.yaml"
+    rebalance = root / "rebalance_rules.yaml"
+    risk_limits = root / "risk_limits.yaml"
+
+    invalid_templates = _valid_templates()
+    invalid_templates["templates"]["balanced"]["weights"]["MISSING"] = 0.1
+
+    try:
+        _write_yaml(universe, _valid_universe())
+        _write_yaml(templates, invalid_templates)
+        _write_yaml(benchmarks, _valid_benchmarks())
+        _write_yaml(rebalance, _valid_rebalance())
+        _write_yaml(risk_limits, _valid_risk_limits())
+
+        with pytest.raises(ValueError, match="not enabled in universe"):
+            validate_phase1_config_files(
+                universe_config_path=universe,
+                portfolio_config_path=templates,
+                benchmark_config_path=benchmarks,
+                rebalance_config_path=rebalance,
+                risk_limits_config_path=risk_limits,
+            )
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_validate_phase1_config_files_raises_for_unknown_risk_switch_destination() -> None:
+    root = Path("data/cache") / f"config_schema_unknown_destination_{uuid.uuid4().hex}"
+    root.mkdir(parents=True, exist_ok=True)
+    universe = root / "etf_universe.yaml"
+    templates = root / "portfolio_templates.yaml"
+    benchmarks = root / "benchmark_config.yaml"
+    rebalance = root / "rebalance_rules.yaml"
+    risk_limits = root / "risk_limits.yaml"
+
+    invalid_rebalance = _valid_rebalance()
+    invalid_rebalance["risk_switch"] = {
+        "enabled": False,
+        "lookback_days": 20,
+        "annualized_volatility_threshold": None,
+        "reduction_fraction": 0.5,
+        "destination_assets": ["MISSING"],
+    }
+
+    try:
+        _write_yaml(universe, _valid_universe())
+        _write_yaml(templates, _valid_templates())
+        _write_yaml(benchmarks, _valid_benchmarks())
+        _write_yaml(rebalance, invalid_rebalance)
+        _write_yaml(risk_limits, _valid_risk_limits())
+
+        with pytest.raises(ValueError, match="risk_switch.destination_assets"):
             validate_phase1_config_files(
                 universe_config_path=universe,
                 portfolio_config_path=templates,

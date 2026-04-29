@@ -44,7 +44,7 @@ from src.portfolio.policy import (
 from src.portfolio.rebalancer import load_standard_rebalance_frequency
 from src.portfolio.rebalancer import load_trend_filter_settings
 from src.portfolio.rebalancer import load_risk_switch_settings
-from src.portfolio.portfolio_scoring import build_portfolio_score_summary
+from src.portfolio.portfolio_scoring import build_portfolio_score_summary, load_portfolio_scoring_rules
 from src.portfolio.rebalancer import (
     load_rebalance_trigger_mode,
     load_drift_rule_enabled,
@@ -58,7 +58,8 @@ from src.portfolio.risk_limits import (
 )
 from src.portfolio.transaction_cost import load_one_way_transaction_cost_bps
 from src.portfolio.weights import load_portfolio_template
-from src.universe.etf_scoring import score_etf_universe
+from src.pipeline.data_sources import hash_files, hash_ticker_csvs, load_price_frames_from_csv
+from src.universe.etf_scoring import load_etf_scoring_rules, score_etf_universe
 from src.universe.liquidity_filter import filter_liquid_universe
 from src.universe.universe_builder import load_enabled_universe
 from src.utils.dates import validate_date_range
@@ -703,6 +704,7 @@ def write_portfolio_score_summary(
     return_table: pd.DataFrame,
     rolling_sharpe_table: pd.DataFrame,
     output_dir: str | Path,
+    scoring_rules: dict | None = None,
 ) -> Path:
     """Persist portfolio-level score summary as an auditable CSV."""
     output_path = Path(output_dir)
@@ -712,6 +714,7 @@ def write_portfolio_score_summary(
         turnover_summary=turnover_summary,
         return_table=return_table,
         rolling_sharpe_table=rolling_sharpe_table,
+        scoring_rules=scoring_rules,
     )
     path = output_path / "portfolio_score_summary.csv"
     portfolio_scores.to_csv(path, index=True)
@@ -1286,6 +1289,8 @@ def build_pipeline_manifest(
     seed: int | None = None,
     risk_limit_breaches: pd.DataFrame | None = None,
     risk_limit_breach_summary: pd.DataFrame | None = None,
+    data_source_mode: str = "download",
+    input_hashes: dict[str, object] | None = None,
 ) -> dict:
     """Build a reproducibility manifest for a completed Phase 1 pipeline run."""
     completed_at = run_completed_at or pd.Timestamp.utcnow().isoformat()
@@ -1313,9 +1318,11 @@ def build_pipeline_manifest(
             "backtest_universe_mode": backtest_universe_mode,
             "rolling_window": rolling_window,
             "template_name": template_name,
+            "data_source_mode": data_source_mode,
             "as_of_date": as_of_date,
             "seed": seed,
         },
+        "input_hashes": input_hashes or {},
         "config_files": {
             name: str(Path(path))
             for name, path in config_paths.items()
@@ -1373,10 +1380,16 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--benchmark-config", default="config/benchmark_config.yaml")
     parser.add_argument("--rebalance-config", default="config/rebalance_rules.yaml")
     parser.add_argument("--risk-limits-config", default="config/risk_limits.yaml")
+    parser.add_argument("--scoring-config", default="config/scoring_rules.yaml")
     parser.add_argument("--template-name", default=None)
     parser.add_argument("--start", required=True, help="Inclusive start date in YYYY-MM-DD format.")
     parser.add_argument("--end", default=None, help="Exclusive end date in YYYY-MM-DD format.")
     parser.add_argument("--raw-dir", default="data/raw")
+    parser.add_argument(
+        "--reuse-raw-data",
+        action="store_true",
+        help="Load per-ticker CSV files from --raw-dir instead of downloading prices.",
+    )
     parser.add_argument("--metadata-dir", default="data/raw/metadata")
     parser.add_argument("--processed-dir", default="data/processed")
     parser.add_argument("--macro-dir", default="data/macro")
@@ -1454,11 +1467,15 @@ def main() -> None:
         benchmark_config_path=args.benchmark_config,
         rebalance_config_path=args.rebalance_config,
         risk_limits_config_path=args.risk_limits_config,
+        scoring_config_path=args.scoring_config,
     )
 
     if args.seed is not None:
         random.seed(args.seed)
         np.random.seed(args.seed)
+
+    etf_scoring_rules = load_etf_scoring_rules(args.scoring_config)
+    portfolio_scoring_rules = load_portfolio_scoring_rules(args.scoring_config)
 
     tickers = load_enabled_tickers(args.universe_config)
     LOGGER.info("Loaded %s enabled tickers from %s", len(tickers), args.universe_config)
@@ -1466,15 +1483,23 @@ def main() -> None:
     save_etf_metadata_snapshots(etf_metadata_summary, output_dir=args.metadata_dir)
     etf_metadata_summary_path = write_etf_metadata_outputs(etf_metadata_summary, args.output_dir)
 
-    raw_frames = fetch_prices(
-        tickers=tickers,
-        start=args.start,
-        end=args.end,
-        output_dir=args.raw_dir,
-        save_raw=True,
-        max_retries=args.download_retries,
-        retry_delay_seconds=args.download_retry_delay,
-    )
+    if args.reuse_raw_data:
+        LOGGER.info("Loading raw price CSVs from %s instead of downloading.", args.raw_dir)
+        raw_frames = load_price_frames_from_csv(tickers=tickers, input_dir=args.raw_dir)
+        price_input_hashes = hash_ticker_csvs(tickers=tickers, input_dir=args.raw_dir)
+        data_source_mode = "reuse_raw_data"
+    else:
+        raw_frames = fetch_prices(
+            tickers=tickers,
+            start=args.start,
+            end=args.end,
+            output_dir=args.raw_dir,
+            save_raw=True,
+            max_retries=args.download_retries,
+            retry_delay_seconds=args.download_retry_delay,
+        )
+        price_input_hashes = hash_ticker_csvs(tickers=tickers, input_dir=args.raw_dir)
+        data_source_mode = "download"
     clean_frames = batch_clean_price_frames(raw_frames)
     save_processed_frames(clean_frames, args.processed_dir)
     data_quality_summary = write_data_quality_outputs(clean_frames, args.output_dir)
@@ -1494,6 +1519,7 @@ def main() -> None:
         args.universe_config,
         liquidity_table,
         metadata_summary=etf_metadata_summary,
+        scoring_rules=etf_scoring_rules,
     )
     write_liquidity_outputs(liquid_tickers, liquidity_table, etf_summary, args.output_dir)
 
@@ -1583,6 +1609,7 @@ def main() -> None:
         turnover_summary=turnover_summary,
         return_table=return_table,
         rolling_sharpe_table=rolling_outputs["rolling_sharpe"],
+        scoring_rules=portfolio_scoring_rules,
         output_dir=args.output_dir,
     )
     portfolio_score_summary = pd.read_csv(portfolio_score_summary_path, index_col=0)
@@ -1653,6 +1680,11 @@ def main() -> None:
         "benchmarks": args.benchmark_config,
         "rebalance_rules": args.rebalance_config,
         "risk_limits": args.risk_limits_config,
+        "scoring_rules": args.scoring_config,
+    }
+    input_hashes = {
+        "config_files": hash_files(config_paths.values()),
+        "raw_price_files": price_input_hashes,
     }
     run_configuration = build_run_configuration_summary(
         start=args.start,
@@ -1761,6 +1793,8 @@ def main() -> None:
         seed=args.seed,
         risk_limit_breaches=risk_limit_breaches,
         risk_limit_breach_summary=risk_limit_breach_summary,
+        data_source_mode=data_source_mode,
+        input_hashes=input_hashes,
     )
     write_pipeline_manifest(manifest, args.output_dir)
     output_inventory = build_output_inventory(
@@ -1911,6 +1945,8 @@ def main() -> None:
         seed=args.seed,
         risk_limit_breaches=risk_limit_breaches,
         risk_limit_breach_summary=risk_limit_breach_summary,
+        data_source_mode=data_source_mode,
+        input_hashes=input_hashes,
     )
     write_pipeline_manifest(manifest, args.output_dir)
 

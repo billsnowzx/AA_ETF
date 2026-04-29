@@ -5,6 +5,7 @@ import pandas as pd
 from src.portfolio.portfolio_scoring import (
     annual_win_rate,
     build_portfolio_score_summary,
+    load_portfolio_scoring_rules,
     monthly_win_rate,
     rolling_sharpe_stability_score,
 )
@@ -80,3 +81,9 @@ def test_build_portfolio_score_summary_orders_higher_quality_portfolio_first() -
     assert summary.loc["balanced", "total_score"] > summary.loc["benchmark_a", "total_score"]
     assert 0.0 <= float(summary.loc["balanced", "score_pct"]) <= 1.0
 
+
+def test_portfolio_scoring_rules_can_be_loaded_from_config() -> None:
+    rules = load_portfolio_scoring_rules("config/scoring_rules.yaml")
+
+    assert rules["return_score"]["annualized_return_upper"] == 0.12
+    assert rules["executability_score"]["transaction_cost_drag_upper"] == 0.020

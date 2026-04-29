@@ -14,6 +14,7 @@ from src.backtest.scenarios import run_robustness_scenarios, write_robustness_sc
 from src.backtest.stress_test import run_start_date_robustness, write_start_date_robustness
 from src.data.clean_data import batch_clean_price_frames
 from src.data.fetch_prices import fetch_prices
+from src.pipeline.data_sources import load_price_frames_from_csv
 from src.portfolio.weights import load_portfolio_template
 from src.universe.universe_builder import load_enabled_universe
 from src.utils.logger import configure_logging
@@ -159,20 +160,24 @@ def run_robustness_workflow(
     stress_one_way_bps: float,
     download_retries: int,
     download_retry_delay: float,
+    reuse_raw_data: bool = False,
     fail_on_missing_outputs: bool = False,
     fail_on_empty_outputs: bool = False,
 ) -> dict[str, Path]:
     """Run robustness sweeps and persist scenario tables."""
     tickers = load_enabled_universe(universe_config).index.tolist()
-    raw_frames = fetch_prices(
-        tickers=tickers,
-        start=start,
-        end=end,
-        output_dir=raw_dir,
-        save_raw=True,
-        max_retries=download_retries,
-        retry_delay_seconds=download_retry_delay,
-    )
+    if reuse_raw_data:
+        raw_frames = load_price_frames_from_csv(tickers=tickers, input_dir=raw_dir)
+    else:
+        raw_frames = fetch_prices(
+            tickers=tickers,
+            start=start,
+            end=end,
+            output_dir=raw_dir,
+            save_raw=True,
+            max_retries=download_retries,
+            retry_delay_seconds=download_retry_delay,
+        )
     clean_frames = batch_clean_price_frames(raw_frames)
     asset_returns = return_matrix_from_prices(build_adjusted_close_matrix(clean_frames))
     target_weights = load_portfolio_template(portfolio_config, template_name)
@@ -271,6 +276,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--start", default="2020-01-01")
     parser.add_argument("--end", default=None)
     parser.add_argument("--raw-dir", default="data/raw")
+    parser.add_argument("--reuse-raw-data", action="store_true")
     parser.add_argument("--output-dir", default="outputs/tables")
     parser.add_argument("--rebalance-frequencies", default="monthly,quarterly")
     parser.add_argument("--one-way-bps-values", default="0,5,10")
@@ -310,6 +316,7 @@ def main() -> None:
         stress_one_way_bps=args.stress_one_way_bps,
         download_retries=args.download_retries,
         download_retry_delay=args.download_retry_delay,
+        reuse_raw_data=args.reuse_raw_data,
         fail_on_missing_outputs=args.fail_on_missing_outputs,
         fail_on_empty_outputs=args.fail_on_empty_outputs,
     )

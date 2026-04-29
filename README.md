@@ -1,14 +1,17 @@
 # Global ETF Asset Allocation Research Platform
 
-This repository contains the Phase 1 foundation for a global ETF asset allocation research platform. The current implementation focuses on auditable pandas-based data ingestion, cleaning, return analytics, and liquidity screening for a compact ETF universe.
+This repository contains a pandas-based global ETF asset allocation research platform. It began as the Phase 1 foundation and now includes data ingestion, cleaning, liquidity screening, fixed-weight backtesting, reporting, dashboard output, risk checks, and robustness sweeps.
 
-## Phase 1 scope
+## Current scope
 
-Phase 1 includes:
+Implemented capabilities include:
 
 - Repository scaffolding aligned with the project spec
 - Config-driven ETF universe, portfolio templates, benchmarks, and rebalance rules
+- Config-driven scoring rules for ETF and portfolio scorecards
+- Cross-file config validation for universe, portfolios, benchmarks, and overlay assets
 - Price download utilities built on `yfinance`
+- Offline raw-data reuse mode for reproducible no-download pipeline runs
 - Reusable price cleaning utilities
 - Return and annualization analytics
 - Drawdown and basic risk-adjusted analytics
@@ -26,10 +29,11 @@ Phase 1 includes:
 - A simple pipeline runner for download, cleaning, and liquidity summary generation
 - Pytest coverage for critical deterministic functions
 
-Phase 1 intentionally excludes:
+Still intentionally excluded:
 
 - Optimization modules such as risk parity and Black-Litterman
-- Advanced optimization workflows and production dashboarding
+- Advanced optimization workflows
+- Production deployment, authentication, and hosted dashboard infrastructure
 
 ## Repository layout
 
@@ -46,6 +50,7 @@ D:\AI\AAETF
 |   |-- backtest/
 |   |-- dashboard/
 |   |-- data/
+|   |-- pipeline/
 |   |-- portfolio/
 |   |-- universe/
 |   `-- utils/
@@ -65,7 +70,10 @@ D:\AI\AAETF
 - `config/portfolio_templates.yaml`: strategic template weights with `balanced` as the default
 - `config/benchmark_config.yaml`: benchmark definitions for Phase 1 evaluation
 - `config/rebalance_rules.yaml`: calendar rebalance, drift thresholds, transaction cost, and placeholder overlay settings
-- `config/risk_limits.yaml`: placeholder risk-limit settings; Phase 1 records this in the manifest but does not enforce limits beyond liquidity filtering
+- `config/risk_limits.yaml`: portfolio risk-limit warning and breach thresholds
+- `config/scoring_rules.yaml`: auditable ETF and portfolio scorecard thresholds
+
+The pipeline validates that configured portfolio, benchmark, and supported overlay tickers are enabled in `config/etf_universe.yaml`.
 
 ## Data flow
 
@@ -108,6 +116,14 @@ To increase download resilience when `yfinance` is unstable:
 ```bash
 python run_pipeline.py --start 2020-01-01 --end 2024-12-31 --download-retries 5 --download-retry-delay 2
 ```
+
+To rerun from existing per-ticker raw CSVs without downloading prices:
+
+```bash
+python run_pipeline.py --start 2020-01-01 --end 2024-12-31 --reuse-raw-data
+```
+
+The manifest records `parameters.data_source_mode` and SHA256 hashes for config files and raw price CSVs under `input_hashes`.
 
 This command will:
 
@@ -191,6 +207,12 @@ To run pipeline + robustness + dashboard in one command:
 python scripts/run_phase1.py --start 2020-01-01 --end 2024-12-31 --run-robustness
 ```
 
+To reuse existing raw price CSVs for the pipeline and robustness stages:
+
+```bash
+python scripts/run_phase1.py --start 2020-01-01 --end 2024-12-31 --run-robustness --reuse-raw-data
+```
+
 ### 2) Robustness sweeps (frequency/cost + start-date sensitivity)
 
 ```bash
@@ -215,6 +237,9 @@ This records deterministic metadata in `outputs/tables/pipeline_manifest.json` u
 
 - `parameters.as_of_date`
 - `parameters.seed`
+- `parameters.data_source_mode`
+- `input_hashes.config_files`
+- `input_hashes.raw_price_files`
 
 ### 4) Run tests
 
@@ -245,7 +270,9 @@ python -m src.dashboard.app --host 127.0.0.1 --port 8000
 ### Troubleshooting
 
 - `Config schema validation failed`:
-  Check YAML structure in `config/etf_universe.yaml`, `config/portfolio_templates.yaml`, `config/benchmark_config.yaml`, and `config/rebalance_rules.yaml`.
+  Check YAML structure and ticker references in `config/etf_universe.yaml`, `config/portfolio_templates.yaml`, `config/benchmark_config.yaml`, `config/rebalance_rules.yaml`, `config/risk_limits.yaml`, and `config/scoring_rules.yaml`.
+- `Missing local raw price files for offline run`:
+  `--reuse-raw-data` requires one CSV per enabled ticker in the selected `--raw-dir`.
 - `Output inventory validation failed; missing artifacts`:
   Re-run pipeline with `--fail-on-missing-outputs` and inspect `outputs/tables/output_inventory.csv`.
 - `Output inventory validation failed; empty artifacts`:

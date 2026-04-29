@@ -17,10 +17,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rolling-window", type=int, default=63)
     parser.add_argument("--as-of-date", default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--scoring-config", default="config/scoring_rules.yaml")
     parser.add_argument("--open-dashboard", action="store_true")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--raw-dir", default="data/raw")
+    parser.add_argument("--reuse-raw-data", action="store_true")
     parser.add_argument("--metadata-dir", default="data/raw/metadata")
     parser.add_argument("--processed-dir", default="data/processed")
     parser.add_argument("--macro-dir", default="data/macro")
@@ -54,6 +56,8 @@ def build_pipeline_command(
         args.backtest_universe_mode,
         "--rolling-window",
         str(args.rolling_window),
+        "--scoring-config",
+        args.scoring_config,
         "--raw-dir",
         args.raw_dir,
         "--metadata-dir",
@@ -85,6 +89,8 @@ def build_pipeline_command(
         command.extend(["--as-of-date", args.as_of_date])
     if args.seed is not None:
         command.extend(["--seed", str(args.seed)])
+    if args.reuse_raw_data:
+        command.append("--reuse-raw-data")
     return command
 
 
@@ -126,6 +132,8 @@ def build_robustness_command(
         command.extend(["--template-name", args.template_name])
     if args.robustness_stress_start_dates:
         command.extend(["--stress-start-dates", args.robustness_stress_start_dates])
+    if args.reuse_raw_data:
+        command.append("--reuse-raw-data")
     return command
 
 
@@ -193,9 +201,6 @@ def main() -> None:
         subprocess.run(dashboard_cmd + ["--open"], check=True, cwd=repo_root)
     else:
         subprocess.run(dashboard_cmd + ["--no-server"], check=True, cwd=repo_root)
-
-    if args.open_dashboard:
-        subprocess.run(build_dashboard_server_command(python_executable, args), check=True, cwd=repo_root)
 
 
 if __name__ == "__main__":
